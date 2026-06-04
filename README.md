@@ -435,3 +435,21 @@ ros2 run tf2_ros tf2_echo odom base_link
 ros2 topic echo /slam_robot/loop_closure_event
 
 ```
+
+# Các lệnh git:
+```bash
+cd ~/Hieu/Project/AGV_Robot
+
+# máy chính
+git status
+git add .
+git commit -m "..."
+git push
+
+# máy phụ
+git clone https://github.com/HieuLe284/AGV_Robot.git
+git pull
+git add .
+git commit -m "Update DWA planner"
+git push
+```
