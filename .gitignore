@@ -1,0 +1,10 @@
+build/
+install/
+log/
+
+.idea/
+
+*.o
+*.so
+*.a
+*.pyc
