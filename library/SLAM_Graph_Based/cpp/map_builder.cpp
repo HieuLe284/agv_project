@@ -25,26 +25,31 @@ void slam::MapBuilder::updateFromRanges(const std::vector<float>& ranges,
         float r = ranges[i];
         if (!std::isfinite(r) || r < 0.1f || r > 30.0f) continue;
 
-        double angle = angle_min + i * angle_inc + pth;
-        double ex = px + r * std::cos(angle);
-        double ey = py + r * std::sin(angle);
+        // Chuyển LaserScan sang tọa độ thế giới
+        // với: 
+        // (x_r, y_r, θ_r): pose robot
+        // r_i: Khoảng cách tia laser thứ i
+        // (x_e, y_e): điểm va chạm vật cản
+        double angle = angle_min + i * angle_inc + pth; // θ_i = θ_min + i*Δθ + θ_r
+        double ex = px + r * std::cos(angle); // x_e = x_r+r_i*cos(θ_i)
+        double ey = py + r * std::sin(angle); // y_e = y_r+r_i*sin(θ_i)
 
-        // Source cell
+        // Ô xuất phát của tia laser
         int sx, sy;
-        worldToGrid(px, py, sx, sy);
+        worldToGrid(px, py, sx, sy); 
 
-        // Endpoint cell
+        // Ô cuối tia laser
         int ex_cell, ey_cell;
         worldToGrid(ex, ey, ex_cell, ey_cell);
 
-        // Ray-cast: free cells along beam
+        // Ray-cast: Các ô không có vật cản nằm trên đường đi của tia laser
         bresenham(sx, sy, ex_cell, ey_cell, kLogOddsFree);
 
-        // Mark endpoint occupied
+        // Đánh dấu ô tại điểm cuối là có vật cản
         if (inBounds(ex_cell, ey_cell))
             log_odds_[ex_cell + ey_cell * width_] =
                 std::min(log_odds_[ex_cell + ey_cell * width_] + kLogOddsOcc,
-                         kLogOddsMax);
+                         kLogOddsMax); // L_t​(m) = min(L_t​(m),L_max​)
     }
 }
 
@@ -74,8 +79,8 @@ void slam::MapBuilder::publishMap(rclcpp::Time stamp) {
 }
 
 void slam::MapBuilder::worldToGrid(double wx, double wy, int& gx, int& gy) const {
-    gx = static_cast<int>((wx - origin_x_) / resolution_);
-    gy = static_cast<int>((wy - origin_y_) / resolution_);
+    gx = static_cast<int>((wx - origin_x_) / resolution_); // g_x​ = ⌊(x_w​−x_origin)/res​​⌋
+    gy = static_cast<int>((wy - origin_y_) / resolution_); // g_y = ⌊(y_w​−y_origin)/res​​⌋
 }
 
 bool slam::MapBuilder::inBounds(int gx, int gy) const {
@@ -88,10 +93,10 @@ void slam::MapBuilder::bresenham(int x0, int y0, int x1, int y1, float log_delta
     int sy = (y0 < y1) ? 1 : -1;
     int err = dx - dy;
     while (true) {
-        if (x0 == x1 && y0 == y1) break;   // stop before endpoint
+        if (x0 == x1 && y0 == y1) break;   // Dừng lại trước endpoint
         if (inBounds(x0, y0)) {
             float& l = log_odds_[x0 + y0 * width_];
-            l = std::max(-kLogOddsMax, l + log_delta);
+            l = std::max(-kLogOddsMax, l + log_delta); // L_t​(m) = max(−L_max​,L_t​(m))
         }
         int e2 = 2 * err;
         if (e2 > -dy) { err -= dy; x0 += sx; }

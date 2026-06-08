@@ -85,17 +85,17 @@ void slam::MatrixX::setZero() {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-//  Gaussian Elimination with partial pivoting
+//  Khử Gauss với phép xoay trục một phần
 // ═══════════════════════════════════════════════════════════════════════════
 
 std::vector<double> slam::solveLinearSystem(slam::MatrixX H, std::vector<double> rhs) {
     const int N = H.rows;
-    // Build augmented matrix [H | rhs]
+    // Tạo ma trận bổ xung (augmented matrix) [H | rhs]
     std::vector<int> piv(N);
     for (int i = 0; i < N; ++i) piv[i] = i;
 
     for (int col = 0; col < N; ++col) {
-        // Find pivot in column col, in rows col..N-1
+        // Tìm điểm xoay trong cột, hàng..N-1
         int maxRow = col;
         double maxVal = std::fabs(H.at(col, col));
         for (int row = col + 1; row < N; ++row) {
@@ -107,14 +107,14 @@ std::vector<double> slam::solveLinearSystem(slam::MatrixX H, std::vector<double>
         if (maxVal < 1e-12)
             throw std::runtime_error("[GaussSolver] Singular matrix in H·Δξ=-b");
 
-        // Swap rows maxRow <-> col
+        // Đổi hàng (maxRow) <-> cho cột (col)
         if (maxRow != col) {
             for (int j = 0; j < N; ++j)
                 std::swap(H.at(col, j), H.at(maxRow, j));
             std::swap(rhs[col], rhs[maxRow]);
         }
 
-        // Eliminate below
+        // Khử các phần tử phía dưới đường chéo chính
         for (int row = col + 1; row < N; ++row) {
             double factor = H.at(row, col) / H.at(col, col);
             for (int j = col; j < N; ++j)
@@ -123,7 +123,7 @@ std::vector<double> slam::solveLinearSystem(slam::MatrixX H, std::vector<double>
         }
     }
 
-    // Back substitution
+    // Giải ngược từ dưới lên
     std::vector<double> x(N, 0.0);
     for (int i = N - 1; i >= 0; --i) {
         x[i] = rhs[i];

@@ -27,10 +27,9 @@ int slam::PoseGraph2D::numEdges() const {
   return static_cast<int>(edges.size());
 }
 
-/// Add an odometry edge i → j
+// thêm cạnh vào odometry i → j
 void slam::PoseGraph2D::addEdge(int i, int j, double zx, double zy, double zt,
-                                double wx, double wy, double wt,
-                                bool loop) {
+                                double wx, double wy, double wt, bool loop) {
   Edge2D e;
   e.from = i;
   e.to = j;

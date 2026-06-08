@@ -30,7 +30,7 @@ void slam::GaussNewtonSolver::solve(PoseGraph2D& graph, int max_iterations) {
                              nj.x, nj.y, nj.theta,
                              edge.z_x, edge.z_y, edge.z_theta, A, B);
 
-            // ── Information matrix Ω_ij (from edge) ───────────────────
+            // ── Ma trận thông tin (Information matrix) Ω_ij (from edge) ───────────────────
             Mat3 Omega;
             for (int r = 0; r < 3; ++r)
                 for (int c = 0; c < 3; ++c)
@@ -59,24 +59,23 @@ void slam::GaussNewtonSolver::solve(PoseGraph2D& graph, int max_iterations) {
             for (int k = 0; k < 3; ++k) b[3*j + k] += BtOe[k];
         }
 
-        // ── Step 3: Gauge fix — anchor node 0 by adding large diagonal ─
+        // ── Step 3: Gauge fix — thêm 10^9 bằng cách thêm đường chéo lớn  ─
         const double kAnchor = 1e9;
         H.at(0, 0) += kAnchor;
         H.at(1, 1) += kAnchor;
         H.at(2, 2) += kAnchor;
 
-        // ── Step 4: Solve H · Δξ = -b ─────────────────────────────────
-        // Negate b so the right-hand side is -b
-        for (auto& val : b) val = -val;
+        // ── Step 4: Giải H · Δξ = -b ─────────────────────────────────
+        for (auto& val : b) val = -val; // phủ định của b = -b
 
         std::vector<double> dx;
         try {
             dx = solveLinearSystem(H, b);
         } catch (const std::runtime_error&) {
-            return;  // singular matrix — skip this iteration
+            return; 
         }
 
-        // ── Step 5: Apply update x_i ← x_i ⊕ Δξ_i ───────────────────
+        // ── Step 5: Update x_i ← x_i ⊕ Δξ_i ───────────────────
         for (int i = 0; i < N; ++i) {
             graph.nodes[i].x     += dx[3*i + 0];
             graph.nodes[i].y     += dx[3*i + 1];

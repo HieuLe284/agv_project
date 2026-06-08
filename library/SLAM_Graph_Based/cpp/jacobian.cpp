@@ -46,25 +46,27 @@ void slam::computeJacobians(
     double Rij_T[2][2];
     makeRotation2D(-zt, Rij_T);
 
-    // dR_i^T/dθ_i — Directly computed for correctness
+    // dR_i^T/dθ_i — Đạo hàm của ma trận quay nghịch đảo theo góc θ_i
     double dRi_T[2][2];
-    makeDRotation2D(-ti, dRi_T); // dR^T/dθ = -(dR/dθ)^T evaluated at -θ
-    // Note: dR(-θ)/d(-θ) = R'(-θ) so dR_i^T/dθ_i requires care.
-    // Directly: R_i^T = [[cosθ, sinθ], [-sinθ, cosθ]]
+    makeDRotation2D(-ti, dRi_T); // dR^T/dθ = -(dR/dθ)^T 
+    // Note: dR(-θ)/d(-θ) = R'(-θ) so dR_i^T/dθ_i
+    // R_i^T = [[cosθ, sinθ], [-sinθ, cosθ]]
     // d/dθ R_i^T = [[-sinθ, cosθ], [-cosθ, -sinθ]]
     dRi_T[0][0] = -std::sin(ti);  dRi_T[0][1] =  std::cos(ti);
     dRi_T[1][0] = -std::cos(ti);  dRi_T[1][1] = -std::sin(ti);
 
     // dt = t_j - t_i
+    // Vector dịch chuyển từ node i tới node j
     double dtx = xj - xi;
     double dty = yj - yi;
 
     // dR_i^T/dθ · (t_j - t_i) ∈ R^2
+    // Thành phần này xuất hiện trong đạo hàm của sai số theo góc θ_i
     double dRdt[2];
     dRdt[0] = dRi_T[0][0] * dtx + dRi_T[0][1] * dty;
     dRdt[1] = dRi_T[1][0] * dtx + dRi_T[1][1] * dty;
 
-    // Compute: R_ij^T · [−R_i^T]  (2×2 block, upper-left of A)
+    // Tính: R_ij^T · [−R_i^T]  (2×2 block, khối 2×2 phía trên bên trái của Jacobian A)
     // −R_ij^T · R_i^T
     double neg_RijT_RiT[2][2];
     for (int r = 0; r < 2; ++r)
@@ -74,14 +76,14 @@ void slam::computeJacobians(
                 neg_RijT_RiT[r][c] += Rij_T[r][k] * (-Ri_T[k][c]);
         }
 
-    // Compute: R_ij^T · dRdt  (2×1 block, third column of A, rows 0-1)
+    // Tính: R_ij^T · dRdt  (2×1 block, // Đây là cột thứ ba của Jacobian A (ảnh hưởng của θ_i lên sai số))
     double RijT_dRdt[2];
     RijT_dRdt[0] = Rij_T[0][0] * dRdt[0] + Rij_T[0][1] * dRdt[1];
     RijT_dRdt[1] = Rij_T[1][0] * dRdt[0] + Rij_T[1][1] * dRdt[1];
 
     // ── A_ij ─────────────────────────────────────────────────────────────
     //   [ -R_ij^T·R_i^T   |  R_ij^T·dR·dt ]
-    //   [   0    0        |      -1        ]
+    //   [   0    0        |      -1       ]
     A(0,0) = neg_RijT_RiT[0][0];
     A(0,1) = neg_RijT_RiT[0][1];
     A(0,2) = RijT_dRdt[0];

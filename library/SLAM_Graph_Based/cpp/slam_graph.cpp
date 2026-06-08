@@ -10,7 +10,9 @@ void slam::SlamGraph::init() {
   pose_graph.nodes.push_back(anchor);
 }
 
-void slam::SlamGraph::setMapBuilder(MapBuilder *mb) { map_builder_ = mb; }
+void slam::SlamGraph::setMapBuilder(MapBuilder *mb) { 
+  map_builder_ = mb; 
+}
 
 int slam::SlamGraph::addOdometryNode(double x, double y, double theta,
                                const std::vector<double> &ranges,
@@ -28,10 +30,11 @@ int slam::SlamGraph::addOdometryNode(double x, double y, double theta,
   double dy = y - prev.y;
   double dist = std::sqrt(dx * dx + dy * dy);
   double dtheta = std::fabs(normalizeAngle(theta - prev.theta));
+  // Kiểm tra ngưỡng từ Lidar => Robot
   if (dist < min_travel_dist && dtheta < min_travel_angle)
     return -1;
 
-  // Thêm node mới vào pose_graph.nodes
+  // Thêm node 2D mới vào pose_graph.nodes
   Node2D node(x, y, theta);
   node.scan_ranges = ranges;
   node.scan_angle_min = angle_min;
@@ -56,7 +59,7 @@ int slam::SlamGraph::addOdometryNode(double x, double y, double theta,
 }
 
 int slam::SlamGraph::addLoopClosures(int new_idx) {
-  if (new_idx < 0)
+  if (new_idx < 0)  
     return -1;
   // Duyệt các node cũ, tính scan correlation
   int matched = loop_detector_.detect(pose_graph, new_idx);
