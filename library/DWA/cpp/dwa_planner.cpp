@@ -1,18 +1,10 @@
 #include "library/DWA/include/dwa_planner.h"
+#include "library/common/math_utils.h"
 
 #include <cmath>
 #include <iostream>
 
 DWAPlanner::DWAPlanner(const DWAConfig& config) : config_(config) {}
-
-// ================================================================
-// Chuẩn hóa góc về [-π, π]
-// ================================================================
-static double normalizeAngle(double a) {
-  while (a >  M_PI) a -= 2.0 * M_PI;
-  while (a < -M_PI) a += 2.0 * M_PI;
-  return a;
-}
 
 // ================================================================
 // findLookaheadGoal — Tìm waypoint lookahead từ path và tính goal_angle nội bộ
@@ -24,34 +16,78 @@ bool DWAPlanner::findLookaheadGoal(
 {
   if (path.empty()) return false;
 
-  // Lookahead distance: 0.6m (~3 lần robot radius)
-  const double LOOKAHEAD_DIST = 0.6;
+  // ================================================================
+  // 1. Tìm nearest segment trên path (điểm gần robot nhất)
+  // ================================================================
 
-  // Tìm waypoint đầu tiên cách robot >= lookahead_dist
-  size_t lookahead_idx = 0;
+  size_t nearest_idx = 0;
   double min_dist = 1e9;
-  for (size_t i = 0; i < path.size(); ++i) {
-    double dx = path[i].first  - robot_x;
+  for (size_t i = 0; i < path.size(); ++i)
+  {
+    double dx = path[i].first - robot_x;
     double dy = path[i].second - robot_y;
-    double d  = std::sqrt(dx*dx + dy*dy);
-    if (d < min_dist) min_dist = d;
-    if (d >= LOOKAHEAD_DIST) {
-      lookahead_idx = i;
-      break;
+    double d = std::sqrt(dx * dx + dy * dy);
+    if ( d < min_dist )
+    {
+      min_dist = d;
+      nearest_idx = i;
     }
   }
 
-  // Nếu không tìm thấy waypoint nào đủ xa, lấy waypoint cuối cùng
-  if (lookahead_idx == 0 && path.size() > 1) {
-    lookahead_idx = path.size() - 1;
+  // ================================================================
+  // 2. Tính hướng (tangent) của path tại nearest segment
+  //    path_direction = góc của vector (path[i+1] - path[i])
+  //    Đây là hướng mà robot NÊN đi theo (theo đúng path)
+  // ================================================================
+  double path_tangent;
+  if (nearest_idx < path.size() - 1)
+  {
+    // Còn waypoint phía trước → lấy hướng từ nearest → next
+    double dx = path[nearest_idx + 1].first  - path[nearest_idx].first;
+    double dy = path[nearest_idx + 1].second - path[nearest_idx].second;
+    path_tangent = std::atan2(dy, dx);
+  }
+  else
+  {
+    // nearest là waypoint cuối cùng → lùi về trước
+    double dx = path[nearest_idx].first  - path[nearest_idx - 1].first;
+    double dy = path[nearest_idx].second - path[nearest_idx - 1].second;
+    path_tangent = std::atan2(dy, dx);
   }
 
-  // Tính goal_angle từ robot đến waypoint lookahead, trong robot frame
-  const auto& wp = path[lookahead_idx];
-  double dx = wp.first  - robot_x;
-  double dy = wp.second - robot_y;
-  double world_angle = std::atan2(dy, dx);
-  goal_angle = normalizeAngle(world_angle - robot_theta);
+  // ================================================================
+  // 3. Chuyển path_tangent từ world frame → robot frame
+  //    goal_angle = path_direction - robot_theta
+  //    Đây là góc mà robot cần xoay để align với hướng của path
+  // ================================================================
+  goal_angle = normalizeAngle(path_tangent - robot_theta);
+
+  // ================================================================
+  // 4. Cross-track correction:
+  //    Nếu robot bị lệch khỏi path (cross-track error > threshold),
+  //    thêm một thành phần steering để đưa robot về gần path.
+  //
+  //    Công thức: steering_correction = atan2( -cross_track_error, lookahead_dist )
+  //    (Giống Pure Pursuit: càng lệch xa, càng bù nhiều)
+  // ================================================================
+  const double CROSS_TRACK_THRESH = 0.20;  // Chỉ bù nếu lệch > 20cm
+  if (min_dist > CROSS_TRACK_THRESH)
+  {
+    // Tính cross-track error: vector từ nearest waypoint đến robot
+    double cte_dx = robot_x - path[nearest_idx].first;
+    double cte_dy = robot_y - path[nearest_idx].second;
+
+    // Chiều cross_track error lên path direction để biết robot lệch trái/phải
+    // cross_track = (-sin(path_tangent) * dx + cos(path_tangent) * dy);
+    double cross_track = -std::sin(path_tangent) * cte_dx + cos(path_tangent) * cte_dy;
+
+    // Steering correction: càng lệch xa, càng bù nhiều (giới hạn ±0.3 rad)
+    const double LOOKAHEAD_CORR = 0.6;
+    double correction = std::atan2(-cross_track, LOOKAHEAD_CORR);
+    correction = std::max(-0.3, std::min(0.3, correction));
+
+    goal_angle = normalizeAngle(goal_angle + correction);
+  }
 
   return true;
 }
@@ -260,8 +296,7 @@ std::vector<std::pair<double, double>> DWAPlanner::scanToObstacles(
     double angle = angle_min + i * angle_increment + yaw_offset;
 
     //Phép chuẩn hóa góc về khoảng [-π, π]
-    while (angle >  M_PI) angle -= 2.0 * M_PI;
-    while (angle < -M_PI) angle += 2.0 * M_PI;
+    angle = normalizeAngle(angle);
 
     // Phép xoay chiếu góc lên tọa độ phẳng
     double x = r * std::cos(angle);

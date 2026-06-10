@@ -42,15 +42,9 @@
 
 #include "matrix.h"
 #include <cmath>
+#include "library/common/math_utils.h"
 
 namespace slam {
-
-// ── Chuẩn hóa góc về miền [-π, π] ──────────────────────────────────────────
-inline double normalizeAngle(double a){
-    while (a >  M_PI) a -= 2.0 * M_PI;
-    while (a < -M_PI) a += 2.0 * M_PI;
-    return a;
-}
 
 // ═══════════════════════════════════════════════════════════════════════════
 //  Ma trận quay 2D R(θ) kích thước 2×2

@@ -1,14 +1,8 @@
 #include "library/DWA/include/dwa_scoring.h"
+#include "library/common/math_utils.h"
 
 #include <algorithm>
 #include <cmath>
-
-// Helper function to normalize angle to [-PI, PI]
-static double normalize_angle(double angle) {
-  while (angle > M_PI) angle -= 2.0 * M_PI;
-  while (angle < -M_PI) angle += 2.0 * M_PI;
-  return angle;
-}
 
 // Công thức Objective Function của DWA
 // G(v,ω) = α⋅heading(v,ω) + β⋅clearance(v,ω) + γ⋅velocity(v,ω)
@@ -110,8 +104,8 @@ double TrajectoryScorer::computeDistance(
       double obs_angle = std::atan2(dy, dx);
 
       // Hai góc có thể xảy ra va chạm
-      double a1 = normalize_angle(obs_angle - delta - start_angle);
-      double a2 = normalize_angle(obs_angle + delta - start_angle);
+      double a1 = normalizeAngle(obs_angle - delta - start_angle);
+      double a2 = normalizeAngle(obs_angle + delta - start_angle);
 
       double travel_angle = 1e9;
 
@@ -171,10 +165,12 @@ double TrajectoryScorer::computeHeading(
   // Khi phanh, vận tốc góc giảm dần đều về 0, nên quãng đường góc = 0.5 * w * t_break
   double theta_pred = w * config.dt + 0.5 * w * t_break; // θ_pred
 
-  double diff = normalize_angle(theta_pred - goal_angle);
+  double diff = normalizeAngle(theta_pred - goal_angle);
 
   // Góc lệch càng nhỏ thì heading score càng gần 1.0
-  return 1.0 - std::abs(diff) / M_PI; // Heading Score
+  double heading = 1.0 - (std::abs(diff) / M_PI) * (std::abs(diff) / M_PI); // Heading Score
+  
+  return heading;
 }
 
 double TrajectoryScorer::computeClearanceScore(

@@ -79,6 +79,10 @@ public:
     int    width_{0}, height_{0}; // Kích thước bản đồ lưới (được sử dụng bên ngoài lớp)
     double resolution_{0.05}; // Độ phân giải bản đồ [m/ô]
 
+    // Bán kính footprint robot [m] — các ô trong phạm vi này không được đánh occupied
+    // (tránh robot tự vẽ chân mình thành tường)
+    static constexpr float kRobotRadius = 0.18f;
+
 private:
     // Tọa độ gốc của bản đồ trong hệ thế giới
     double origin_x_{0.0}, origin_y_{0.0};
@@ -88,8 +92,8 @@ private:
 
     // Các tham số cập nhật Log-Odds (có thể tinh chỉnh)
     static constexpr float kLogOddsFree = -0.4f;  // Mức tăng độ tin cậy rằng ô là ô trống
-    static constexpr float kLogOddsOcc  =  0.85f; // Mức tăng độ tin cậy rằng ô có vật cản
-    static constexpr float kLogOddsMax  =  5.0f;  // Giới hạn trên/dưới của log-odds để tránh bão hòa
+    static constexpr float kLogOddsOcc  =  2.0f;  // Mức tăng độ tin cậy rằng ô có vật cản (tăng lên 2.0 để tường không bị xóa bởi free ray)
+    static constexpr float kLogOddsMax  =  10.0f; // Giới hạn trên/dưới của log-odds để tránh bão hòa
     static constexpr float kThreshOcc   =  0.5f;  // Ngưỡng xác định ô có vật cản
     static constexpr float kThreshFree  = -0.5f;  // Ngưỡng xác định ô trống
 

@@ -1,6 +1,8 @@
 #ifndef DWA_PLANNER_H
 #define DWA_PLANNER_H
 
+#include <rclcpp/rclcpp.hpp>
+
 #include "library/DWA/include/dwa_config.h"
 #include "library/DWA/include/dwa_scoring.h"
 #include "library/DWA/include/dwa_state.h"

@@ -46,10 +46,18 @@ void slam::MapBuilder::updateFromRanges(const std::vector<float>& ranges,
         bresenham(sx, sy, ex_cell, ey_cell, kLogOddsFree);
 
         // Đánh dấu ô tại điểm cuối là có vật cản
-        if (inBounds(ex_cell, ey_cell))
-            log_odds_[ex_cell + ey_cell * width_] =
-                std::min(log_odds_[ex_cell + ey_cell * width_] + kLogOddsOcc,
-                         kLogOddsMax); // L_t​(m) = min(L_t​(m),L_max​)
+        // CHỈ đánh dấu nếu điểm cuối ở ngoài bán kính footprint robot
+        // (tránh robot tự vẽ chân mình hoặc nhiễu cự ly gần thành tường)
+        if (inBounds(ex_cell, ey_cell)) {
+            double dx = ex - px;
+            double dy = ey - py;
+            double dist = std::sqrt(dx*dx + dy*dy);
+            if (dist > kRobotRadius) {
+                log_odds_[ex_cell + ey_cell * width_] =
+                    std::min(log_odds_[ex_cell + ey_cell * width_] + kLogOddsOcc,
+                             kLogOddsMax); // L_t​(m) = min(L_t​(m),L_max​)
+            }
+        }
     }
 }
 
@@ -96,7 +104,11 @@ void slam::MapBuilder::bresenham(int x0, int y0, int x1, int y1, float log_delta
         if (x0 == x1 && y0 == y1) break;   // Dừng lại trước endpoint
         if (inBounds(x0, y0)) {
             float& l = log_odds_[x0 + y0 * width_];
-            l = std::max(-kLogOddsMax, l + log_delta); // L_t​(m) = max(−L_max​,L_t​(m))
+            // NẾU log_delta < 0 (free update) và ô đã confident occupied (l >= kThreshOcc)
+            // THÌ bỏ qua, không xóa tường
+            if (log_delta >= 0 || l < kThreshOcc) {
+                l = std::max(-kLogOddsMax, l + log_delta); // L_t​(m) = max(−L_max​,L_t​(m))
+            }
         }
         int e2 = 2 * err;
         if (e2 > -dy) { err -= dy; x0 += sx; }

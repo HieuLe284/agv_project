@@ -60,9 +60,10 @@ class PathSimplifier {
    *
    * @param raw_path    Đường đi thô từ A*
    * @param tolerance   Ngưỡng đơn giản hóa [m]
+   * @param max_spacing Giới hạn cho waypoint mới
    * @return          
    */
-  static AStarPath simplify(const AStarPath& raw_path, double tolerance);
+  static AStarPath simplify(const AStarPath& raw_path, double tolerance, double max_spacing);
 
   /**
    * @brief Tính tổng chiều dài đường đi [m]

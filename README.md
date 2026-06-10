@@ -426,13 +426,24 @@ export DISPLAY=:0
 # Các lệnh debug:
 
 ```bash
+ros2 run rqt_console rqt_console
+rqt
 ros2 topic echo /joint_states                                # Xem dữ liệu encoder / bánh xe / motor
 ros2 topic echo /scan                                       # Xem dữ liệu / Lidar
 ros2 topic echo /cmd_vel                                    # Xem tín hiệu điều khiển / output / motor 
-ros2 run rqt_console rqt_console
-rqt
-ros2 run tf2_ros tf2_echo odom base_link
 ros2 topic echo /slam_robot/loop_closure_event
+ros2 topic echo /agv_scan --once
+ros2 topic echo /tf --once
+ros2 topic echo /clock --once
+ros2 run tf2_ros tf2_echo map base_link
+ros2 run tf2_ros tf2_echo odom base_link
+ros2 run tf2_ros tf2_monitor
+ros2 run tf2_tools view_frames
+ros2 param get /rviz2 use_sim_time
+ros2 param get /robot_state_publisher use_sim_time
+ros2 param get /slam_node use_sim_time
+ros2 param get /dwa_node use_sim_time
+ros2 param get /frontier_node use_sim_time
 
 ```
 

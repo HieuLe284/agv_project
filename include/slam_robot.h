@@ -8,6 +8,7 @@
 #include "geometry_msgs/msg/pose_stamped.hpp"
 #include "geometry_msgs/msg/transform_stamped.hpp"
 #include "nav_msgs/msg/occupancy_grid.hpp"
+#include "nav_msgs/msg/path.hpp"
 #include "sensor_msgs/msg/laser_scan.hpp"
 #include "std_msgs/msg/string.hpp"
 #include "visualization_msgs/msg/marker_array.hpp"
@@ -18,9 +19,13 @@
 #include "tf2_geometry_msgs/tf2_geometry_msgs.hpp"
 #include "tf2/LinearMath/Quaternion.h"
 
+// ── Math utilities ────────────────────────────────────────────────────────────
+#include "library/common/math_utils.h"
+
 // ── Standard library ─────────────────────────────────────────────────────────
 #include <atomic>
 #include <cmath>
+#include <mutex>
 #include <string>
 #include <vector>
 
@@ -31,6 +36,12 @@
 // ── Frontier-Based Exploration Library (lib/frontier_based) ──────────────────
 #include "library/frontier_based/include/frontier_exploration.h"
 #include "library/frontier_based/include/frontier_detector.h"
+
+// ── A* Global Planner Library (lib/A_star_algorithm) ─────────────────────────
+#include "library/A_star_algorithm/include/astar_global_planner.h"
+
+// ── DWA Local Planner Library (lib/DWA) ──────────────────────────────────────
+#include "library/DWA/include/dwa_planner.h"
 
 using std::placeholders::_1;
 
@@ -71,17 +82,21 @@ struct Pose2D {
 //            • Phát hiện frontier regions bằng Wave-Front BFS
 //            • Chọn frontier tốt nhất theo cost function
 //            • Xuất bản markers visualization lên RViz
+//              + A* Global Planner + DWA Local Planner
 // ═════════════════════════════════════════════════════════════════════════════
 class SlamRobot : public rclcpp::Node {
 public:
     SlamRobot();
 
 private:
-    // ── Chuẩn hóa góc về miền [-π, π] ────────────────────────────────────────
-    inline double normalizeAngle(double a){
-        while (a >  M_PI) a -= 2.0 * M_PI;
-        while (a < -M_PI) a += 2.0 * M_PI;
-        return a;
+    /**
+     * @brief Helper chuyển tf2::Quaternion sang góc yaw [rad]
+     * @param q Tham chiếu tf2::Quaternion
+     * @return Góc yaw [rad]
+     */
+    static inline double getYaw(const tf2::Quaternion& q) {
+        return std::atan2(2.0 * (q.w() * q.z() + q.x() * q.y()),
+                         1.0 - 2.0 * (q.y() * q.y() + q.z() * q.z()));
     }
 
     /**
@@ -151,14 +166,16 @@ private:
      * Bước 4 — Tái tạo bản đồ
      *   Nếu đồ thị vừa được tối ưu: clearMap()
      *   Sau đó: updateMapFromNode() cho toàn bộ node trong graph.
-     * @param x,y,theta Pose hiện tại lấy từ: map → base_link
+
+     * Bước 5 — Cập nhật map→odom TF
+     * @param x,y,theta Pose hiện tại lấy từ: odom → base_link
+     * * @return -1 nếu không có node mới, 0 nếu có node mới, 1 nếu có node mới + optimized
      */
-    void graphSLAMcall(double x, double y, double theta);
+    int graphSLAMcall(double x, double y, double theta);
 
     // ═══════════════════════════════════════════════════════════════════════
     //  Frontier-Based Exploration (Yamauchi, 1997)
     // ═══════════════════════════════════════════════════════════════════════
-
     /**
      * @brief Thực hiện Frontier-Based Exploration.
      *
@@ -171,7 +188,7 @@ private:
      * @param cur  Pose hiện tại của robot (x, y, theta) trong map frame
      */
     void slam_exploration(Pose2D& cur);
-
+    
     /**
      * @brief Publish frontier regions + goal visualization lên /frontier_markers
      *
@@ -191,25 +208,53 @@ private:
      */
     void frontierTimerCallback();
 
-    // TF map → odom Mặc định: map = odom 
+    // ═══════════════════════════════════════════════════════════════════════
+    //  A* Global Planner (Hart, Nilsson, Raphael, 1968)
+    // ═══════════════════════════════════════════════════════════════════════
+
+    void globalPlannerTimerCallback();
+    void slam_globalPlanner(double rx, double ry, double rth);
+    void publishGlobalPath();
+    void publishAStarWaypoints();
+
+    // ═══════════════════════════════════════════════════════════════════════
+    //  DWA Local Planner (Fox, Burgard, Thrun, 1997)
+    // ═══════════════════════════════════════════════════════════════════════
+
+    void localPlannerTimerCallback();
+    void slam_localPlanner(double rx, double ry, double rth,
+                           double rv, double rw);
+
+    // TF map → odom (hiệu chỉnh SLAM)
     double map_odom_x = 0.0, map_odom_y = 0.0, map_odom_theta = 0.0; // map→odom TF (identity)
 
     // ── Publishers ────────────────────────────────────────────────────────
-    rclcpp::Publisher<geometry_msgs::msg::Twist>::SharedPtr         pub_cmd_;                // Điều khiển robot
-    rclcpp::Publisher<nav_msgs::msg::OccupancyGrid>::SharedPtr      pub_map_;                // Occupancy Grid Map
-    rclcpp::Publisher<geometry_msgs::msg::PoseArray>::SharedPtr     pub_graph_nodes_;        // Pose Graph nodes
-    rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr pub_graph_edges_;     // Pose Graph edges
+    rclcpp::Publisher<geometry_msgs::msg::Twist>::SharedPtr         pub_cmd_; // Điều khiển robot
+    rclcpp::Publisher<nav_msgs::msg::OccupancyGrid>::SharedPtr      pub_map_; // Occupancy Grid Map
+    rclcpp::Publisher<geometry_msgs::msg::PoseArray>::SharedPtr     pub_graph_nodes_; // Pose Graph nodes
+    rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr pub_graph_edges_; // Pose Graph edges
     rclcpp::Publisher<std_msgs::msg::String>::SharedPtr             pub_loop_closure_event_; // Thông báo phát hiện Loop Closure
     rclcpp::Publisher<sensor_msgs::msg::LaserScan>::SharedPtr       pub_scan_visualization_; // LaserScan dùng cho trực quan hóa
     rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr pub_frontier_markers_; // Frontier markers visualization
+    rclcpp::Publisher<nav_msgs::msg::Path>::SharedPtr               pub_global_path_;
+    rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr pub_astar_waypoints_;
 
     // ── Subscribers ───────────────────────────────────────────────────────
-    rclcpp::Subscription<sensor_msgs::msg::LaserScan>::SharedPtr sub_scan_;                  // Nhận dữ liệu LiDAR
+    rclcpp::Subscription<sensor_msgs::msg::LaserScan>::SharedPtr sub_scan_; // Nhận dữ liệu LiDAR
 
     // ── Timers ────────────────────────────────────────────────────────────
-    rclcpp::TimerBase::SharedPtr timer_;             // 5 Hz SLAM + viz timer
-    rclcpp::TimerBase::SharedPtr map_timer_;         // 5 Hz map publish timer
-    rclcpp::TimerBase::SharedPtr frontier_timer_;    // 2 Hz frontier exploration timer
+    rclcpp::TimerBase::SharedPtr timer_; // 5 Hz SLAM timer (no viz!)
+    rclcpp::TimerBase::SharedPtr tf_broadcast_timer_; // 50 Hz TF broadcast (decoupled from SLAM)
+    rclcpp::TimerBase::SharedPtr map_timer_; // 2 Hz map publish timer
+    rclcpp::TimerBase::SharedPtr graph_viz_timer_; // 0.5 Hz graph visualization
+    rclcpp::TimerBase::SharedPtr frontier_timer_; // 2 Hz frontier exploration timer
+    rclcpp::TimerBase::SharedPtr global_planner_timer_;
+    rclcpp::TimerBase::SharedPtr local_planner_timer_;
+
+    // ── Graph viz dirty flag ──────────────────────────────────────────────
+    std::atomic<bool> graph_viz_dirty_{true};
+    bool graph_has_changed_{false}; // set by graphSLAMcall, read+cleared by viz timer
+    void graphVizTimerCallback();
 
     // ── TF2 ──────────────────────────────────────────────────────────────
     std::shared_ptr<tf2_ros::Buffer>              tf_buffer_;       // Bộ đệm TF
@@ -217,37 +262,66 @@ private:
     std::shared_ptr<tf2_ros::TransformBroadcaster> tf_broadcaster_; // Phát TF
 
     // ── Callback Groups ───────────────────────────────────────────────────
-    rclcpp::CallbackGroup::SharedPtr callback_group_lidar_;  // Nhóm callback LiDAR
-    rclcpp::CallbackGroup::SharedPtr callback_group_slam_;   // Nhóm callback SLAM
+    rclcpp::CallbackGroup::SharedPtr callback_group_lidar_; // Nhóm callback LiDAR
+    rclcpp::CallbackGroup::SharedPtr callback_group_slam_; // Nhóm callback SLAM
     rclcpp::CallbackGroup::SharedPtr callback_group_frontier_; // Nhóm callback Frontier
+    rclcpp::CallbackGroup::SharedPtr callback_group_global_planner_;
+    rclcpp::CallbackGroup::SharedPtr callback_group_local_planner_;
 
     // ── Graph-Based SLAM ──────────────────────────────────────────────────
-    slam::SlamGraph  slam_graph_;   // Full SLAM pipeline 
-    slam::MapBuilder map_builder_;  // Log-Odds occupancy grid
+    slam::SlamGraph  slam_graph_; // Full SLAM pipeline 
+    slam::MapBuilder map_builder_; // Log-Odds occupancy grid
 
     // ── Dữ liệu LiDAR được lưu tạm ────────────────────────────────────────
-    std::vector<double> cached_scan_ranges_;  // Chia sẻ giữa scanCallback & graphSLAMcall
-    double cached_scan_angle_min_{0.0};       // Góc bắt đầu của LaserScan
+    std::vector<double> cached_scan_ranges_; // Chia sẻ giữa scanCallback & graphSLAMcall
+    double cached_scan_angle_min_{0.0}; // Góc bắt đầu của LaserScan
     double cached_scan_angle_increment_{0.0}; // Độ phân giải góc
 
     // ── Map state ─────────────────────────────────────────────────────────
     bool map_initialized_{false}; // true = khởi tạo
 
+    // ── Cached OccupancyGrid (chỉ build 1 lần, dùng cho cả frontier + A* + publish) ──
+    std::mutex map_mutex_;
+    nav_msgs::msg::OccupancyGrid cached_occ_grid_; // snapshot của occupancy grid
+    bool cached_grid_valid_{false};
+    void refreshCachedGrid(); // build fresh + swap
+
     // ═══════════════════════════════════════════════════════════════════════
     //  Frontier-Based Exploration Members
     // ═══════════════════════════════════════════════════════════════════════
 
-    std::atomic<bool> exploration_mode_{false};  // Bật/tắt chế độ thám hiểm
+    std::atomic<bool> exploration_mode_{false}; // Bật/tắt chế độ thám hiểm
 
-    FrontierExploration frontier_explorer_;       // Frontier-Based Exploration coordinator
-
+    FrontierExploration frontier_explorer_; // Frontier-Based Exploration coordinator
+   
     // Dữ liệu frontier từ lần detect gần nhất (dùng cho visualization)
     std::vector<FrontierRegion> cached_regions_;
     double cached_robot_x_{0.0};
     double cached_robot_y_{0.0};
     double cached_goal_x_{0.0};
     double cached_goal_y_{0.0};
+    double active_goal_x_{0.0};
+    double active_goal_y_{0.0};
+    bool   active_goal_valid_{false};
     bool   cached_has_goal_{false};
+
+    // ═══════════════════════════════════════════════════════════════════════
+    //  A* Global Planner Members
+    // ═══════════════════════════════════════════════════════════════════════
+
+    AStarGlobalPlanner global_planner_{AStarConfig()};
+
+    std::vector<std::pair<double, double>> cached_global_path_;
+    bool  cached_path_valid_{false};
+    int   global_planner_step_{0};
+
+    // ═══════════════════════════════════════════════════════════════════════
+    //  DWA Local Planner Members
+    // ═══════════════════════════════════════════════════════════════════════
+
+    DWAPlanner dwa_planner_{DWAConfig()};
+    double current_v_{0.0};
+    double current_w_{0.0};
 };
 
 #endif  // SLAM_ROBOT_H

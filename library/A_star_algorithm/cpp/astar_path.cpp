@@ -25,6 +25,7 @@ double PathSimplifier::computeLength(const AStarPath& path) {
 // ================================================================
 //  Đơn giản hóa đường đi — Collinearity Check
 //
+// Step 1: Collinearity check với tolerance nhỏ hơn
 //  Với 3 điểm A=(x_A,y_A), B=(x_B,y_B), C=(x_C,y_C):
 //    vector(AB) = (x_B - x_A, y_B - y_A)
 //    vector(AC) = (x_C - x_A, y_C - y_A)
@@ -34,25 +35,27 @@ double PathSimplifier::computeLength(const AStarPath& path) {
 //    dist_B_to_AC = |cross| / vector(|AC|)
 //
 //  Nếu dist_B_to_AC < tolerance → B thẳng hàng với AC → loại B
+// Step 2: 
 // ================================================================
-AStarPath PathSimplifier::simplify(const AStarPath& raw_path, double tolerance) {
-  AStarPath result;
-  result.valid = raw_path.valid; // sao chép cờ hợp lệ
+AStarPath PathSimplifier::simplify(const AStarPath& raw_path, double tolerance, double max_spacing) {
+  // Step1: Collinearity check với tolerance nhỏ hơn
+  AStarPath collinearity;
+  collinearity.valid = raw_path.valid; // sao chép cờ hợp lệ
 
   // Điều kiện biên: Nếu đường đi có 2 điểm hoặc ít hơn thì không cần đơn giản hóa
   const auto& pts = raw_path.waypoints;
   if (pts.size() <= 2) {
-    result.waypoints = pts;
-    result.total_length = computeLength(result);
-    result.waypoint_count = static_cast<int>(result.waypoints.size());
-    return result;
+    collinearity.waypoints = pts;
+    collinearity.total_length = computeLength(collinearity);
+    collinearity.waypoint_count = static_cast<int>(collinearity.waypoints.size());
+    return collinearity;
   }
 
-  result.waypoints.push_back(pts.front()); // Luôn giữ điểm đầu tiên
+  collinearity.waypoints.push_back(pts.front()); // Luôn giữ điểm đầu tiên
 
   // Khai báo vector
   for (size_t i = 1; i + 1 < pts.size(); ++i) {
-    const auto& A = result.waypoints.back();  // Điểm cuối đã giữ
+    const auto& A = collinearity.waypoints.back();  // Điểm cuối đã giữ
     const auto& B = pts[i];                   // Điểm hiện tại
     const auto& C = pts[i + 1];               // Điểm tiếp theo
 
@@ -76,14 +79,44 @@ AStarPath PathSimplifier::simplify(const AStarPath& raw_path, double tolerance) 
 
     // Nếu B quá gần đường AC → loại bỏ B (thẳng hàng)
     if (dist_b_to_ac >= tolerance) {
-      result.waypoints.push_back(B);
+      collinearity.waypoints.push_back(B);
     }
   }
 
   // Luôn giữ điểm cuối cùng (goal)
-  result.waypoints.push_back(pts.back());
+  collinearity.waypoints.push_back(pts.back());
 
-  result.total_length   = computeLength(result);
-  result.waypoint_count = static_cast<int>(result.waypoints.size());
-  return result;
+  // Step 2: Chèn waypoint mới nếu khoảng cách giữa 2 điểm > max_spacing
+  AStarPath spacing;
+  spacing.valid = collinearity.valid;
+
+  if(collinearity.waypoints.empty()) return spacing;
+
+  // Luôn giữ điểm đầu tiên
+  spacing.waypoints.push_back(collinearity.waypoints.front());
+
+  for (size_t i = 1; i < collinearity.waypoints.size(); ++i) {
+    const auto& prev = collinearity.waypoints[i - 1];
+    const auto& curr = collinearity.waypoints[i];
+
+    double dx = curr.first - prev.first;
+    double dy = curr.second - prev.second;
+    double dist = std::sqrt(dx * dx + dy * dy);
+
+    if (dist > max_spacing && max_spacing > 0.01) {
+      // Chèn thêm waypoint trung gian
+      int num_segments = static_cast<int>(std::ceil(dist / max_spacing));
+      for (int j = 1; j < num_segments; ++j) {
+        double ratio = static_cast<double>(j) / num_segments;
+        double wx = prev.first + ratio * dx;
+        double wy = prev.second + ratio * dy;
+        spacing.waypoints.emplace_back(wx, wy);
+      }
+    }
+    spacing.waypoints.push_back(curr);
+  }
+
+  spacing.total_length   = computeLength(spacing);
+  spacing.waypoint_count = static_cast<int>(spacing.waypoints.size());
+  return spacing;
 }

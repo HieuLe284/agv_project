@@ -94,7 +94,8 @@ struct AStarConfig {
   // ================================================================
   //  Path Simplification
   // ================================================================
-  double simplify_tolerance{0.05};  ///< Ngưỡng bỏ điểm thẳng hàng [m]
+  double simplify_tolerance{0.01};  // Ngưỡng bỏ điểm thẳng hàng [m]
+  double max_waypoint_spacing{0.5}; // Chèn waypoint mới nếu khoảng cách > 0.5
 };
 
 #endif  // ASTAR_CONFIG_H

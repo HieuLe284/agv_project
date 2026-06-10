@@ -58,7 +58,7 @@ struct DWAConfig {
       v_min(-0.10),        // Hạn chế đi lùi (chỉ dùng emergency)
       w_max(1.5),          // Tăng w_max để xoay linh hoạt hơn
       a_v_max(2.0),        // Tăng gia tốc → Dynamic Window rộng hơn
-      a_w_max(3.0),        // Tăng gia tốc góc
+      a_w_max(5.0),        // Tăng gia tốc góc
       v_dot_b(1.5),
       w_dot_b(3.0),
       // [FIX]: Phục hồi robot_radius về 0.15m đúng với thực tế vật lý.
@@ -70,9 +70,9 @@ struct DWAConfig {
       // Weights cho chế độ BÌNH THƯỜNG (không nguy hiểm).
       // Khi nguy hiểm, cơ chế Preemptive Escape trong dwa_planner.cpp
       // sẽ override và trả về lệnh xoay thoát trực tiếp.
-      alpha(0.5),          // Heading: bám theo A* path
+      alpha(0.15),          // Heading: bám theo A* path
       beta(0.4),           // Clearance: né tường từ xa (kết hợp D_normalize=3.0m)
-      gamma(0.1),
+      gamma(0.3),
       sensor_max_range(8.0) {}
 };
 

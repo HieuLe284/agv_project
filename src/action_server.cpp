@@ -8,6 +8,7 @@
 #include "geometry_msgs/msg/twist.hpp"
 #include "nav_msgs/msg/odometry.hpp"
 #include "agv_robot/action/move_cmd.hpp"
+#include "library/common/math_utils.h"
 
 class MoveActionServer : public rclcpp::Node
 {
@@ -45,15 +46,11 @@ private:
   double current_y_ = 0.0;
   double current_yaw_ = 0.0;
 
-  double getYawFromQuaternion(double x, double y, double z, double w) {
-    return std::atan2(2.0 * (w * z + x * y), 1.0 - 2.0 * (y * y + z * z));
-  }
-
   void odomCallback(const nav_msgs::msg::Odometry::SharedPtr msg)
   {
     current_x_ = msg->pose.pose.position.x;
     current_y_ = msg->pose.pose.position.y;
-    current_yaw_ = getYawFromQuaternion(
+    current_yaw_ = quatToYaw(
       msg->pose.pose.orientation.x,
       msg->pose.pose.orientation.y,
       msg->pose.pose.orientation.z,

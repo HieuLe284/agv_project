@@ -3,6 +3,7 @@
 #include "tf2_ros/buffer.h"
 #include "tf2/exceptions.h"
 #include "geometry_msgs/msg/transform_stamped.hpp"
+#include "library/common/math_utils.h"
 
 #include <chrono>
 #include <functional>
@@ -57,8 +58,7 @@ private:
       double qw = t.transform.rotation.w;
 
       // Tính góc yaw từ quaternion
-      double yaw = std::atan2(2.0 * (qw * qz + qx * qy), 
-                              1.0 - 2.0 * (qy * qy + qz * qz));
+      double yaw = quatToYaw(qx, qy, qz, qw);
 
       RCLCPP_INFO(this->get_logger(),
         "[TF2] odom→base_link: pos=(%.3f, %.3f, %.3f) | yaw=%.2f rad",

@@ -26,18 +26,10 @@
  */
 
 #include "library/A_star_algorithm/include/astar_global_planner.h"
+#include "library/common/math_utils.h"
 
 #include <cmath>
 #include <algorithm>
-
-// ================================================================
-//  Chuẩn hóa góc về [-π, π]
-// ================================================================
-static double normalizeAngle(double a) {
-  while (a >  M_PI) a -= 2.0 * M_PI;
-  while (a < -M_PI) a += 2.0 * M_PI;
-  return a;
-}
 
 // ================================================================
 //  Constructor
@@ -107,7 +99,7 @@ bool AStarGlobalPlanner::runAstar(double robot_x, double robot_y) {
   // Đơn giản hóa đường đi bằng đường đi zig-zag vuông góc theo grid, loại bỏ các node
   //thừa không cần thiết bằng cách nội suy Douglas-Peucker. Sau đó đánh index duyệt danh
   //sách từ node waypoint
-  current_path_   = PathSimplifier::simplify(raw_path, config_.simplify_tolerance);
+  current_path_   = PathSimplifier::simplify(raw_path, config_.simplify_tolerance, config_.max_waypoint_spacing);
   current_wp_idx_ = 0;
   return true;
 }

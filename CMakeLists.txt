@@ -41,6 +41,9 @@ ament_target_dependencies(robot_controller
 # Node Action Server: Điều khiển xe theo lệnh
 add_executable(action_server src/action_server.cpp)
 ament_target_dependencies(action_server rclcpp rclcpp_action geometry_msgs nav_msgs)
+target_include_directories(action_server PUBLIC
+  ${CMAKE_CURRENT_SOURCE_DIR}
+)
 rosidl_get_typesupport_target(cpp_typesupport_target ${PROJECT_NAME} "rosidl_typesupport_cpp")
 target_link_libraries(action_server "${cpp_typesupport_target}")
 
@@ -56,6 +59,9 @@ ament_target_dependencies(tf2_listener
   tf2_ros
   tf2
   geometry_msgs
+)
+target_include_directories(tf2_listener PUBLIC
+  ${CMAKE_CURRENT_SOURCE_DIR}
 )
 
 # Node 3: slam_robot — Graph SLAM / Pose Graph Optimization + tránh vật cản
