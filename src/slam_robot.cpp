@@ -906,6 +906,134 @@ void SlamRobot::slam_localPlanner(double rx, double ry, double rth,
         return;
     }
 
+    // ================================================================
+    //  STUCK DETECTION: nếu robot ra lệnh nhưng không di chuyển
+    //  trong STUCK_TIME_THRESH giây → kích hoạt recovery
+    // ================================================================
+    if (!stuck_detected_)
+    {
+        // Tính khoảng cách di chuyển từ lần kiểm tra trước
+        double dx = rx - stuck_prev_x_;
+        double dy = ry - stuck_prev_y_;
+        double dist_moved = std::sqrt(dx * dx + dy * dy);
+
+        // Nếu robot đang ra lệnh chạy (v != 0 hoặc w != 0)
+        // nhưng di chuyển rất ít → cộng dồn thời gian kẹt
+        if (std::abs(rv) > 0.01 || std::abs(rw) > 0.02)
+        {
+            if (dist_moved < STUCK_DIST_THRESH)
+            {
+                stuck_movement_timer_ += 0.2; // 200ms mỗi lần gọi
+                if (stuck_movement_timer_ > STUCK_TIME_THRESH)
+                {
+                    RCLCPP_WARN(get_logger(),
+                        "[STUCK] Detected! Robot not moving for %.1fs despite commands. "
+                        "dist_moved=%.3f v=%.3f w=%.3f → Starting recovery...",
+                        stuck_movement_timer_, dist_moved, rv, rw);
+                    stuck_detected_ = true;
+                    stuck_phase_ = 1;  // Bắt đầu phase lùi
+                    stuck_escape_elapsed_ = 0.0;
+                }
+            }
+            else
+            {
+                // Robot di chuyển bình thường → reset timer
+                stuck_movement_timer_ = 0.0;
+            }
+        }
+        else
+        {
+            // Robot đang dừng (không có lệnh) → không detect kẹt
+            stuck_movement_timer_ = 0.0;
+        }
+
+        stuck_prev_x_ = rx;
+        stuck_prev_y_ = ry;
+    }
+
+    // ================================================================
+    //  STUCK RECOVERY: override cmd_vel nếu đang ở chế độ thoát kẹt
+    // ================================================================
+    if (stuck_detected_)
+    {
+        geometry_msgs::msg::Twist escape_cmd;
+        stuck_escape_elapsed_ += 0.2; // 200ms mỗi lần gọi
+
+        if (stuck_phase_ == 1)
+        {
+            // Phase 1: Lùi nhẹ để tạo khoảng trống
+            escape_cmd.linear.x = STUCK_REVERSE_V;
+            escape_cmd.angular.z = 0.0;
+            if (stuck_escape_elapsed_ >= STUCK_REVERSE_TIME)
+            {
+                stuck_phase_ = 2;
+                stuck_escape_elapsed_ = 0.0;
+                RCLCPP_INFO(get_logger(), "[STUCK] Phase 1 done → Phase 2: Turn");
+            }
+        }
+        else if (stuck_phase_ == 2)
+        {
+            // Phase 2: Xoay về phía trống hơn
+            // Dùng LiDAR để chọn hướng xoay
+            double left_clearance = 0.0, right_clearance = 0.0;
+            if (!cached_scan_ranges_.empty())
+            {
+                // Tính clearance trái/phải từ scan
+                size_t n = cached_scan_ranges_.size();
+                double angle_min = cached_scan_angle_min_;
+                double angle_inc = cached_scan_angle_increment_;
+                for (size_t i = 0; i < n; ++i)
+                {
+                    double r = cached_scan_ranges_[i];
+                    if (std::isinf(r) || std::isnan(r) || r < 0.12) continue;
+                    double angle = normalizeAngle(angle_min + i * angle_inc);
+                    if (angle > 0 && angle < M_PI_2)
+                        left_clearance += std::min(r, 3.0);
+                    else if (angle < 0 && angle > -M_PI_2)
+                        right_clearance += std::min(r, 3.0);
+                }
+            }
+            // Xoay về hướng có clearance lớn hơn, mặc định xoay trái
+            escape_cmd.linear.x = 0.0;
+            if (left_clearance > right_clearance + 1.0)
+                escape_cmd.angular.z = STUCK_TURN_W;      // Xoay trái
+            else if (right_clearance > left_clearance + 1.0)
+                escape_cmd.angular.z = -STUCK_TURN_W;     // Xoay phải
+            else
+                escape_cmd.angular.z = STUCK_TURN_W;      // Mặc định xoay trái
+
+            if (stuck_escape_elapsed_ >= STUCK_TURN_TIME)
+            {
+                stuck_phase_ = 3;
+                stuck_escape_elapsed_ = 0.0;
+                RCLCPP_INFO(get_logger(), "[STUCK] Phase 2 done → Phase 3: Recovery wait");
+            }
+        }
+        else if (stuck_phase_ == 3)
+        {
+            // Phase 3: Chờ hồi phục, cho DWA hoạt động lại
+            escape_cmd.linear.x = 0.0;
+            escape_cmd.angular.z = 0.0;
+            if (stuck_escape_elapsed_ >= STUCK_RECOVERY_TIME)
+            {
+                RCLCPP_INFO(get_logger(), "[STUCK] Recovery complete → Resume normal control");
+                stuck_detected_ = false;
+                stuck_phase_ = 0;
+                stuck_movement_timer_ = 0.0;
+            }
+        }
+
+        pub_cmd_->publish(escape_cmd);
+        current_v_ = escape_cmd.linear.x;
+        current_w_ = escape_cmd.angular.z;
+
+        RCLCPP_INFO_THROTTLE(get_logger(), *get_clock(), 500,
+            "[STUCK] Phase %d: v=%.3f w=%.3f elapsed=%.1fs",
+            stuck_phase_, escape_cmd.linear.x, escape_cmd.angular.z,
+            stuck_escape_elapsed_);
+        return;  // Bỏ qua DWA khi đang escape
+    }
+
     DWAState state(rx, ry, rth, rv, rw);
 
     std::vector<float> scan_f(cached_scan_ranges_.begin(),
@@ -933,6 +1061,7 @@ void SlamRobot::slam_localPlanner(double rx, double ry, double rth,
         "[DWA] cmd_vel → v=%.3f m/s  w=%.3f rad/s | Path WPs: %zu",
         v_star, w_star, cached_global_path_.size());
 }
+
 
 // ════════════════════════════════════════════════════════════════════════════
 //  main

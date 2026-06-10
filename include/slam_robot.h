@@ -322,6 +322,25 @@ private:
     DWAPlanner dwa_planner_{DWAConfig()};
     double current_v_{0.0};
     double current_w_{0.0};
+
+    // ═══════════════════════════════════════════════════════════════════════
+    //  Stuck Detection & Recovery
+    // ═══════════════════════════════════════════════════════════════════════
+    bool   stuck_detected_{false};          // true = đang trong chế độ thoát kẹt
+    double stuck_prev_x_{0.0};              // Pose X lần kiểm tra trước [m]
+    double stuck_prev_y_{0.0};              // Pose Y lần kiểm tra trước [m]
+    double stuck_movement_timer_{0.0};      // Thời gian không di chuyển [s]
+    double stuck_escape_elapsed_{0.0};      // Thời gian đã thực hiện escape [s]
+    int    stuck_phase_{0};                 // 0=normal, 1=lùi, 2=xoay, 3=chờ hồi phục
+    static constexpr double STUCK_DIST_THRESH = 0.03;     // Ngưỡng di chuyển tối thiểu [m]
+    static constexpr double STUCK_TIME_THRESH  = 1.5;     // Thời gian không move để trigger [s]
+    static constexpr double STUCK_REVERSE_V    = -0.06;   // Vận tốc lùi khi kẹt [m/s]
+    static constexpr double STUCK_REVERSE_TIME = 0.6;     // Thời gian lùi [s]
+    static constexpr double STUCK_TURN_W       = 0.8;     // Vận tốc xoay khi kẹt [rad/s]
+    static constexpr double STUCK_TURN_TIME    = 1.0;     // Thời gian xoay [s]
+    static constexpr double STUCK_RECOVERY_TIME = 0.5;    // Thời gian hồi phục sau escape [s]
 };
 
 #endif  // SLAM_ROBOT_H
+
+
