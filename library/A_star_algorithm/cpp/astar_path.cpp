@@ -35,7 +35,9 @@ double PathSimplifier::computeLength(const AStarPath& path) {
 //    dist_B_to_AC = |cross| / vector(|AC|)
 //
 //  Nếu dist_B_to_AC < tolerance → B thẳng hàng với AC → loại B
-// Step 2: 
+// Step 2: Chèn waypoint mới nếu khoảng cách giữa 2 điểm > max_spacing
+//  Sau khi lọc từ step 1 giờ chèn thêm điểm trung gian để khoảng cách 
+// giữa 2 điểm liên tiếp để tối ưu đường đi của robot
 // ================================================================
 AStarPath PathSimplifier::simplify(const AStarPath& raw_path, double tolerance, double max_spacing) {
   // Step1: Collinearity check với tolerance nhỏ hơn
@@ -99,17 +101,17 @@ AStarPath PathSimplifier::simplify(const AStarPath& raw_path, double tolerance, 
     const auto& prev = collinearity.waypoints[i - 1];
     const auto& curr = collinearity.waypoints[i];
 
-    double dx = curr.first - prev.first;
-    double dy = curr.second - prev.second;
+    double dx = curr.first - prev.first; // d_x = x_2​ − x_1​
+    double dy = curr.second - prev.second; // d_y = y_2 - y_1
     double dist = std::sqrt(dx * dx + dy * dy);
 
     if (dist > max_spacing && max_spacing > 0.01) {
       // Chèn thêm waypoint trung gian
-      int num_segments = static_cast<int>(std::ceil(dist / max_spacing));
+      int num_segments = static_cast<int>(std::ceil(dist / max_spacing)); // num_segments = max_spacing / dist
       for (int j = 1; j < num_segments; ++j) {
-        double ratio = static_cast<double>(j) / num_segments;
-        double wx = prev.first + ratio * dx;
-        double wy = prev.second + ratio * dy;
+        double ratio = static_cast<double>(j) / num_segments; // ratio = j / num_segments​
+        double wx = prev.first + ratio * dx;  // w_x ​= x_1 ​+ ratio * dx
+        double wy = prev.second + ratio * dy; // w_y ​= y_1 ​+ ratio * dx
         spacing.waypoints.emplace_back(wx, wy);
       }
     }

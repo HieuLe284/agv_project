@@ -137,7 +137,6 @@ class FrontierDetector {
       const FrontierMap& map,
       int start_x,
       int start_y,
-      // std::vector<std::vector<bool>>& frontier_visited) const;
       std::vector<uint8_t>& frontier_visited, int W) const;
 };
 

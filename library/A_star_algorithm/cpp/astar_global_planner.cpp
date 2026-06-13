@@ -115,33 +115,6 @@ double AStarGlobalPlanner::dist(double x1, double y1, double x2, double y2) {
 }
 
 // ================================================================
-//  Góc từ vị trí robot đến điểm target (trong robot frame)
-// công thức góc tuyệt đối: α = arctan(dy,dx)
-// Trong đó: 
-//  - dx = x_target - x_robot
-//  - dy = y_target - y_robot
-//  - dưới dạng matrix: [dx] = [x_target - x_robot]
-//                      [dy]   [y_target - y_robot]
-// Công thức góc tương đối: θ_error = α − θ_robot
-//  Trong đó:
-//   - α: góc tuyệt đối của vector (dx, dy)
-//   - θ_robot: góc yaw hiện tại của robot (rad)
-//   - θ_error: thành phần góc của R(θ_robot)
-//  vector(v_robot) = R(θ_robot) * vector(v_target)
-//  R(θ_robot) = [cos(θ_robot)   sin(θ_robot)]
-//               [-sin(θ_robot)  cos(θ_robot)]
-// ================================================================
-double AStarGlobalPlanner::angleToTarget(
-    double from_x, double from_y, double theta,
-    double to_x, double to_y)
-{
-  double dx = to_x - from_x;
-  double dy = to_y - from_y;
-  double angle_to_target = std::atan2(dy, dx);     // góc tuyệt đối
-  return normalizeAngle(angle_to_target - theta);  // góc tương đối
-}
-
-// ================================================================
 //  getCurrentWaypointX — trả về tọa độ X của waypoint hiện tại
 // ================================================================
 double AStarGlobalPlanner::getCurrentWaypointX() const {

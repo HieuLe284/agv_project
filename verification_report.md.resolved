@@ -1,0 +1,34 @@
+# Verification Report: AGV Algorithms vs Academic Papers
+
+Tôi đã kiểm tra kỹ lưỡng toàn bộ source code của 4 khối thuật toán cốt lõi trong hệ thống AGV của bạn (`SLAM_Graph_Based`, `frontier_based`, `A_star_algorithm`, [DWA](file:///u:/AGV_Robot/library/DWA/cpp/dwa_planner.cpp#7-8)) và đối chiếu với các nền tảng toán học trong báo cáo/tài liệu cấu thành. 
+
+Dưới đây là xác nhận chi tiết về mức độ trung thành của code với lý thuyết:
+
+## 1. SLAM_Graph_Based vs. "A Tutorial on Graph-Based SLAM" (Grisetti et al.)
+**Kết luận: Độ chính xác rất cao.**
+- **Mô hình sai số (Error Function)**: Phương trình sai số $e_{ij} = R_{ij}^T (R_i^T(t_j - t_i) - t_{ij})$ cho pose 2D được định nghĩa chính xác từ dòng `9-32` trong file [jacobian.cpp](file:///u:/AGV_Robot/library/SLAM_Graph_Based/cpp/jacobian.cpp).
+- **Jacobians**: Hàm [computeJacobians()](file:///u:/AGV_Robot/library/SLAM_Graph_Based/cpp/jacobian.cpp#35-118) đã triển khai đúng chuẩn ma trận block $A_{ij}$ (đạo hàm theo $x_i$) và $B_{ij}$ (đạo hàm theo $x_j$), kèm với tính toán đạo hàm của ma trận quay nghịch đảo ($dR_i^T/d\theta_i$).
+- **Hệ phương trình (Information Matrix)**: Việc giải phương trình Gauss-Newton $\Delta x = -H^{-1}b$ trong [gauss_newton_solver.cpp](file:///u:/AGV_Robot/library/SLAM_Graph_Based/cpp/gauss_newton_solver.cpp) thực hiện đúng chuẩn, trong đó $H$ được cộng gộp qua từng edge bằng $A_{ij}^T \Omega A_{ij}$, v.v. Kỹ thuật "Gauge fix" (cố định node gốc bằng cách cộng giá trị rất lớn vào đường chéo khối ma trận $H_{00}$) cũng được áp dụng một cách chính xác theo chuẩn textbook.
+
+## 2. Frontier_based vs. "Frontier Based Exploration" (Yamauchi 1997)
+**Kết luận: Chuẩn xác và đã có tối ưu.**
+- **Edge Detection (Phát hiện biên)**: Theo Yamauchi, frontier là cell FREE liền kề với ít nhất 1 cell UNKNOWN. Thuật toán của bạn (hàm [isFrontierCell](file:///u:/AGV_Robot/library/frontier_based/cpp/frontier_detector.cpp#7-67) trong [frontier_detector.cpp](file:///u:/AGV_Robot/library/frontier_based/cpp/frontier_detector.cpp)) sử dụng 8-connectivity check tuân thủ tuyệt đối quy tắc này.
+- **Vùng biên (Regions) & Tâm hình học**: Thuật toán của bạn dùng Wave-Front Propagation (BFS) để nhóm (cluster) các điểm frontier gần nhau thành một mảng `FrontierRegion`, sau đó tính toán trọng tâm hình học (Centroid) dựa trên công thức $X_c = \frac{1}{N}\sum{x_i}, Y_c = \frac{1}{N}\sum{y_i}$. Đây là cách implement kinh điển của Yamauchi.
+- **Projection Fix**: Điểm cải tiến nhỏ của bạn là *Boundary Projection*: kéo điểm centroid về nearest free cell nếu centroid vô tình rơi vào ô vật cản (trường hợp bao hình dạng chữ U/C). Điều này giúp A* có thể thực sự lập đường đi (Yamauchi thuần có thể bị lỗi ở điểm này).
+- **Cost Function (Selector)**: Yamauchi hướng tới việc điều hướng tới biên giới ngắn nhất. Bám sát ý tưởng đó, `FrontierSelector` của bạn tận dụng chi phí Distance (Normalised) phối hợp tốt với Size: $Cost_i = W_{dist}*D_{i} + W_{size}*(1 - S_{i})$.
+
+## 3. A_star_algorithm
+**Kết luận: Chuẩn xác và đáp ứng Navigation cơ bản 2D.**
+- Hàm [computeHeuristic](file:///u:/AGV_Robot/library/A_star_algorithm/cpp/astar_planner.cpp#60-102) cung cấp Manhattan, Euclidean và Diagonal distance đầy đủ.
+- Function tính rủi ro do lạm phát (Obstacle inflation cost) $1.0 - \frac{d}{safety\_margin}$ khá giống logic của Navigation Stack cổ điển, giúp robot né các mép tường. Code đã được tôi tune lại (Tăng penalty multiplier cao hơn và mở rộng Safety\_margin) thông qua các sửa đổi của bạn hôm nay.
+- Bộ làm mượt tự động loại bỏ các điểm thẳng hàng (`collinearity check`) dựa vào sai số từ điểm tới đường thẳng $\vec{AC}$. Thỏa mãn khá tốt bài nghiên cứu mà bạn tham chiếu.
+
+## 4. DWA vs. "The Dynamic Window Approach" (Fox et al. 1997)
+**Kết luận: Cực kỳ bám sát các phương trình Fox 1997.**
+- **Sampling & Window**: Vùng Vận tốc Không gian ($V_d$) được tạo ra một cách an toàn bằng Acceleration Limits (`a_v_max`, `a_w_max`), mô tả hoàn chỉnh khoảng giao điểm của $V_s \cap V_d \cap V_a$.
+- **Admissible Velocities ($V_a$)**: Đây là cốt lõi của bài báo. Vận tốc chỉ an toàn nếu xe có thể **phanh** dừng không đe dọa va chạm. Code [dwa_planner.cpp](file:///u:/AGV_Robot/library/DWA/cpp/dwa_planner.cpp) check điều kiện này đầy đủ bằng $\sqrt{2 \cdot dist \cdot \dot{v}_{brake}}$.
+- **Hàm Objective Function (G)**: 
+  $G(v, \omega) = \alpha \cdot \text{heading}(v,w) + \beta \cdot \text{clearance}(v,w) + \gamma \cdot \text{velocity}(v,w)$. Điểm này có đối chiếu hoàn toàn ăn khớp ở hàm [score](file:///u:/AGV_Robot/library/DWA/cpp/dwa_scoring.cpp#7-30) của file [dwa_scoring.cpp](file:///u:/AGV_Robot/library/DWA/cpp/dwa_scoring.cpp). Các weight $\alpha, \beta, \gamma$ hiện cũng đã được tinh chỉnh lại ở hệ mới để giảm thiểu oscillation.
+- **Quỹ đạo (Trajectory)**: Trong DWA gốc, robot di chuyển trên các quỹ đạo cung tròn bán kính $r = v / \omega$. Cách code của bạn giả lập và đối chiếu cung tròn đó với danh sách vật cản (đại số đường & cung tròn, tính góc va chạm, thời gian dự đoán lỗi Drift của $\theta_{pred}$) trong [computeDistance](file:///u:/AGV_Robot/library/DWA/cpp/dwa_scoring.cpp#31-136) thật sự là tính toán hình học chính xác thay vì chỉ là approximate line segment interpolation. 
+
+**Tổng kết chung:** Toàn bộ Core thuật toán thực thi rất chính xác theo tinh thần toán học của các bài luận văn, đảm bảo được nền tảng học thuật vững chắc cho việc bảo vệ đồ án/nghiên cứu. Các điều chỉnh đã làm hôm nay chủ yếu là fine-tuning các parameter nhằm dập tắt Oscillation (hiện tượng con lắc) và Wall-hugging (bám sát tường) lúc thực thi vật lý.

@@ -1,0 +1,67 @@
+digraph DWAAlgorithm {
+    // Cài đặt đồ thị chung
+    graph [fontname="Arial, Helvetica, sans-serif", fontsize=12, rankdir=TB, splines=ortho, nodesep=0.8, ranksep=0.8];
+    node [fontname="Arial, Helvetica, sans-serif", fontsize=10, shape=box, style=filled, fillcolor="#f9f9f9", color="#333333", width=2];
+    edge [fontname="Arial, Helvetica, sans-serif", fontsize=9, color="#666666"];
+
+    // Tiêu đề
+    labelloc="t";
+    label="Dynamic Window Approach (DWA)\nLocal Navigation Architecture";
+    fontsize=16;
+    fontweight=bold;
+
+    // Các thành phần cấu trúc (Architecture)
+    subgraph cluster_arch {
+        label="Cấu trúc Modules";
+        style=dashed;
+        color="#888888";
+
+        DWAPlanner [label="DWAPlanner\n(Coordinator)\n- computeVelocity(state, scan, path)", fillcolor="#e0eaf5", shape=Mrecord];
+        DynamicWindow [label="DynamicWindow\n- Tính V_d ∩ V_s\n- Truy xuất {v_low, v_high, w_low, w_high}", fillcolor="#fff3cd"];
+        TrajectoryScorer [label="TrajectoryScorer\n- Chấm điểm đa mục tiêu\n- G = α·head + β·clear + γ·vel", fillcolor="#d4edda"];
+        ObstacleModel [label="Tập Vật cản & Lookahead Finder\n- Polar Scan → XY Descartes\n- Tự tìm goal_angle nội bộ", fillcolor="#f8d7da"];
+
+        DWAPlanner -> LookaheadFinder [label="1. Truy vết Path"];
+        DWAPlanner -> scanToObstacles [label="2. Lấy dữ liệu Laser"];
+        DWAPlanner -> DynamicWindow [label="3. Lấy tập Vận tốc"];
+        DWAPlanner -> TrajectoryScorer [label="7. Optimize G-Cost"];
+    }
+
+    // Nguồn dữ liệu & Các khối nhỏ giấu bên trong
+    AStarPath [label="Global Path\n(Từ A*)", shape=ellipse, fillcolor="#cce5ff"];
+    ScanSource [label="LiDAR Scan\n(Cực - Polar)", shape=cylinder, fillcolor="#eeeeee"];
+    MotorCmd [label="Motor Command\n{v*, w*}", shape=box3d, fillcolor="#cce5ff"];
+
+    LookaheadFinder [label="findLookaheadGoal()\n(Tính goal_angle)", shape=oval, style=filled, fillcolor="#ffffff"];
+    scanToObstacles [label="scanToObstacles()\n(Tọa độ Đề-các)", shape=oval, style=filled, fillcolor="#ffffff"];
+    
+    AStarPath -> LookaheadFinder;
+    ScanSource -> scanToObstacles;
+
+    // Luồng thuật toán chi tiết
+    subgraph cluster_logic {
+        label="Luồng Xử lý Thuật Toán (compute core)";
+        color="#888888";
+        
+        PreemptiveEscape [label="Fall-back Khẩn cấp?\n(min_dist < 0.25m)", shape=diamond, fillcolor="#ffeeba"];
+        EscapeAction [label="Xoay lùi tại chỗ\n{v = -0.03, w = escape_w}", style=filled, fillcolor="#f5c6cb"];
+        
+        SamplingGrid [label="Tạo lưới [v, w] (Sampling)\n- Thử từng góc rẽ\n- Thử từng vận tốc", shape=rect, fillcolor="#e2e3e5"];
+        ClearanceCheck [label="5. Tính dist_to_obstacle\n(Dùng Hình học Cung tròn)", shape=rect, fillcolor="#e2e3e5"];
+        AdmissibleCheck [label="6. Admissible (V_a)?\n(v <= sqrt(2*dist*v_break))", shape=diamond, fillcolor="#ffeeba"];
+        ThrowPath [label="Loại bỏ Trajectory", style=filled, fillcolor="#d6d8db"];
+        BestScore [label="Cập nhật {v*, w*}\n(Objective Function Max)", shape=rect, fillcolor="#d1ecf1"];
+        
+        PreemptiveEscape -> EscapeAction [label="YES"];
+        PreemptiveEscape -> SamplingGrid [label="NO (An toàn)"];
+        
+        SamplingGrid -> ClearanceCheck [label="Mỗi cặp v_test, w_test"];
+        ClearanceCheck -> AdmissibleCheck;
+        AdmissibleCheck -> ThrowPath [label="NO (Va chạm/Xuyên tường)"];
+        AdmissibleCheck -> BestScore [label="YES (Đủ khoảng cách phanh)"];
+    }
+
+    DynamicWindow -> PreemptiveEscape [style=dotted];
+    BestScore -> MotorCmd [label="Tín hiệu CMD_VEL"];
+    EscapeAction -> MotorCmd [label="Tín hiệu thoát vây"];
+}

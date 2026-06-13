@@ -311,7 +311,7 @@ private:
 
     AStarGlobalPlanner global_planner_{AStarConfig()};
 
-    std::vector<std::pair<double, double>> cached_global_path_;
+    std::vector<std::pair<double, double>> cached_global_path_; // Nhận path từ A*
     bool  cached_path_valid_{false};
     int   global_planner_step_{0};
 

@@ -70,8 +70,8 @@ struct AStarConfig {
   // [FIX Bug#5]: safety_margin = 2 cells (0.10m) — vừa đủ để A* tìm đường qua khe hẹp
   // mà vẫn đảm bảo robot không cắt góc quá gần tường.
   // Kết hợp với DWA robot_radius = 0.15m → tổng clearance = 0.25m từ tường.
-  double obstacle_penalty{2.0};   ///< Chi phí thêm khi đi qua cell gần vật cản
-  int    safety_margin{4};        ///< Số cell an toàn xung quanh vật cản [cells] (2 cells = 0.10m)
+  double obstacle_penalty{5.0};   // Chi phí thêm khi đi qua cell gần vật cản
+  int    safety_margin{8};        // 8 × 0.05m = 0.40m — vùng an toàn rộng gấp đôi
 
   // ================================================================
   //  Navigation
@@ -95,7 +95,7 @@ struct AStarConfig {
   //  Path Simplification
   // ================================================================
   double simplify_tolerance{0.01};  // Ngưỡng bỏ điểm thẳng hàng [m]
-  double max_waypoint_spacing{0.18}; // Chèn waypoint mới nếu khoảng cách > 0.18 (dày hơn cho góc cua)
+  double max_waypoint_spacing{0.35}; // Chèn waypoint mới nếu khoảng cách > 0.18 (dày hơn cho góc cua)
 
 };
 

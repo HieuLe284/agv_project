@@ -1,0 +1,146 @@
+# Tích hợp Dynamic Window Approach (DWA) vào SLAM
+
+Thay thế toàn bộ logic điều khiển cũ (`scanCallback`) bằng thuật toán DWA toán học đầy đủ.
+DWA được module hóa thành thư viện riêng tại `library/DWA/`, tích hợp vào `SlamAvoidObstacle`
+thông qua một hàm điều khiển mới `dwaControl()`.
+
+---
+
+## Công thức toán học DWA
+
+DWA hoạt động theo 3 bước lặp mỗi chu kỳ scan:
+
+### 1. Dynamic Window
+Giới hạn không gian vận tốc theo khả năng gia tốc của robot trong 1 bước thời gian `dt`:
+
+```
+Vd = { (v, w) | v ∈ [v_cur - a_v*dt, v_cur + a_v*dt]
+               w ∈ [w_cur - a_w*dt, w_cur + a_w*dt] }
+```
+
+Giao với không gian vận tốc kinematics:
+```
+Vs = { (v, w) | v ∈ [0, v_max],  w ∈ [-w_max, w_max] }
+```
+
+### 2. Simulation Trajectory
+Với mỗi cặp `(v, w)` trong dynamic window, mô phỏng quỹ đạo robot trong `T_horizon` giây:
+```
+x(t+dt) = x(t) + v * cos(θ(t)) * dt
+y(t+dt) = y(t) + v * sin(θ(t)) * dt
+θ(t+dt) = θ(t) + w * dt
+```
+
+### 3. Objective Function (chọn (v,w) tối ưu)
+```
+G(v, w) = α · heading(v,w) + β · clearance(v,w) + γ · velocity(v,w)
+```
+
+| Thành phần | Công thức | Ý nghĩa |
+|---|---|---|
+| `heading` | `1 - |θ_goal - θ_robot| / π` | Hướng tới mục tiêu |
+| `clearance` | `min_dist_to_obstacle / r_safe` | Khoảng cách tới vật cản |
+| `velocity` | `v / v_max` | Tối đa hóa tốc độ |
+
+Nếu bất kỳ điểm nào trên quỹ đạo mô phỏng va vào vật cản (`dist < robot_radius`), đánh dấu trajectory đó là không hợp lệ.
+
+---
+
+## Cấu trúc thư mục
+
+```
+library/DWA/
+├── include/
+│   ├── dwa_config.h        # Cấu hình tham số DWA
+│   ├── dwa_state.h         # State robot (v, w, pose)
+│   ├── dwa_window.h        # Tính Dynamic Window
+│   ├── dwa_trajectory.h    # Mô phỏng quỹ đạo
+│   ├── dwa_scoring.h       # Tính hàm mục tiêu G(v,w)
+│   └── dwa_planner.h       # Class điều phối chính
+└── cpp/
+    ├── dwa_window.cpp
+    ├── dwa_trajectory.cpp
+    ├── dwa_scoring.cpp
+    └── dwa_planner.cpp
+```
+
+---
+
+## Proposed Changes
+
+### 1. Library DWA — Các file mới
+
+#### [NEW] `library/DWA/include/dwa_config.h`
+Struct `DWAConfig` chứa toàn bộ tham số vật lý của robot và DWA:
+- `v_max`, `w_max`, `a_v_max`, `a_w_max`
+- `robot_radius`, `dt`, `T_horizon`
+- `alpha`, `beta`, `gamma` (trọng số hàm mục tiêu)
+- `v_samples`, `w_samples` (số lượng sample chia grid)
+
+#### [NEW] `library/DWA/include/dwa_state.h`
+Struct `DWAState` đại diện trạng thái robot `(x, y, theta, v, w)`.
+
+#### [NEW] `library/DWA/include/dwa_window.h` + `cpp/dwa_window.cpp`
+Class `DynamicWindow`: tính vùng vận tốc khả thi `[v_min, v_max] x [w_min, w_max]`.
+
+#### [NEW] `library/DWA/include/dwa_trajectory.h` + `cpp/dwa_trajectory.cpp`
+Class `TrajectorySimulator`: mô phỏng quỹ đạo robot cho 1 cặp `(v, w)` trong `T_horizon` giây. Trả về `std::vector<DWAState>` và flag `is_valid`.
+
+#### [NEW] `library/DWA/include/dwa_scoring.h` + `cpp/dwa_scoring.cpp`
+Class `TrajectoryScorer`: tính điểm `G(v,w) = α·heading + β·clearance + γ·velocity`.
+
+#### [NEW] `library/DWA/include/dwa_planner.h` + `cpp/dwa_planner.cpp`
+Class `DWAPlanner` (điều phối chính):
+- `computeVelocity(state, scan_ranges, angle_min, angle_increment, goal_angle)` → `std::pair<double,double> (v_best, w_best)`
+- Gọi `DynamicWindow` → duyệt grid samples → `TrajectorySimulator` → `TrajectoryScorer` → chọn best.
+
+---
+
+### 2. Sửa `library/slam_avoid_obstacle.h`
+- Thêm `#include "library/DWA/include/dwa_planner.h"`
+- Xóa các member state điều khiển cũ: `is_turning_`, `turn_direction_`, `turn_time_`, `escape_phase_`, `is_ultra_emergency_`
+- Thêm member `DWAPlanner dwa_planner_`
+- Thêm khai báo hàm private `void dwaControl(const sensor_msgs::msg::LaserScan::SharedPtr scan)`
+
+### 3. Sửa `library/slam_avoid_obstacle.cpp`
+- Xóa toàn bộ logic cũ trong `scanCallback` (giữ phần đọc scan raw)
+- Hàm `scanCallback` chỉ đọc dữ liệu scan rồi gọi `dwaControl(scan)`
+- Thêm hàm `SlamAvoidObstacle::dwaControl(scan)`:
+  - Build `DWAState` từ `cmd_v_`, `cmd_w_` hiện tại
+  - Gọi `dwa_planner_.computeVelocity(...)`
+  - Store kết quả vào `cmd_v_`, `cmd_w_`, publish
+
+### 4. Sửa `CMakeLists.txt`
+- Thêm `file(GLOB_RECURSE DWA_SRCS "library/DWA/cpp/*.cpp")`
+- Thêm `${DWA_SRCS}` vào `add_executable(slam_robot ...)`
+- Thêm `library/DWA/include` vào `target_include_directories`
+
+---
+
+## Verification Plan
+
+### Build Test
+```bash
+colcon build --packages-select agv_robot
+```
+
+### Runtime Sanity Check
+Chạy node và kiểm tra topic `/cmd_vel` có publish đúng không:
+```bash
+ros2 topic echo /cmd_vel
+```
+
+### Manual Review
+- Mỗi file `.h` có đầy đủ `#ifndef` guards
+- Công thức DWA được comment rõ ràng bằng ký hiệu toán học trong code
+- `dwaControl()` là hàm duy nhất đẩy lệnh xuống publisher
+
+---
+
+## Open Questions
+
+> [!IMPORTANT]
+> **Mục tiêu điều hướng**: DWA cần một góc/hướng mục tiêu `goal_angle` để tính `heading score`. Hiện tại robot không có goal rõ ràng. Tôi sẽ dùng **`goal_angle = 0.0` (đi thẳng về phía trước)** làm mặc định — robot sẽ cố đi thẳng nhưng né vật cản. Bạn có muốn giữ cách này, hay cần tích hợp goal từ nguồn khác (action server, nav2)?
+
+> [!NOTE]
+> Các trọng số `alpha=0.15, beta=1.0, gamma=0.2` sẽ được đặt mặc định trong `DWAConfig`. Bạn có thể điều chỉnh sau khi test thực tế.

@@ -35,12 +35,6 @@ bool AStarMap::isFree(int x, int y) const {
   return data_[y * width_ + x] == 0;
 }
 
-// Kiểm tra cell có giá trị -1 (chưa biết)
-bool AStarMap::isUnknown(int x, int y) const {
-  if (!isValid(x, y)) return false;
-  return data_[y * width_ + x] == -1;
-}
-
 // Kiểm tra cell có giá trị > threshold (vật cản)
 bool AStarMap::isOccupied(int x, int y, int threshold) const {
   if (!isValid(x, y)) return true;  // Ngoài biên → coi là vật cản

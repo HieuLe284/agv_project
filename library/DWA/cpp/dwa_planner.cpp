@@ -7,7 +7,7 @@
 DWAPlanner::DWAPlanner(const DWAConfig& config) : config_(config) {}
 
 // ================================================================
-// findLookaheadGoal — Tìm lookahead point phía trước robot trên path
+// findLookaheadGoal — Tìm lookahead point phía trước robot trên path ( heading(v,w))
 // ================================================================
 bool DWAPlanner::findLookaheadGoal(
     double robot_x, double robot_y, double robot_theta,
@@ -17,7 +17,8 @@ bool DWAPlanner::findLookaheadGoal(
   if (path.empty()) return false;
 
   // ================================================================
-  // 1. Tìm nearest waypoint trên path (điểm gần robot nhất)
+  // 1. Tìm nearest waypoint trên path (điểm gần robot nhất) theo 
+  // khoảng cách Eucilid. Nhằm chọn điểm gần nhất của robot trên global path
   // ================================================================
   size_t nearest_idx = 0;
   double min_dist = 1e9;
@@ -46,6 +47,7 @@ bool DWAPlanner::findLookaheadGoal(
   double prev_x = path[nearest_idx].first;
   double prev_y = path[nearest_idx].second;
 
+  //s_k ​= ∑_k_{j=i∗+1} ​(x_j​−x_(j−1)​)^2 + (y_j​−y_(j−1)​)^2
   for (size_t i = nearest_idx + 1; i < path.size(); ++i)
   {
     double dx = path[i].first - prev_x;
@@ -54,7 +56,7 @@ bool DWAPlanner::findLookaheadGoal(
     prev_x = path[i].first;
     prev_y = path[i].second;
 
-    if (accumulated >= LOOKAHEAD_DIST)
+    if (accumulated >= LOOKAHEAD_DIST) // s_k >= LOOKAHEAD_DIST
     {
       lookahead_idx = i;
       break;
@@ -68,10 +70,10 @@ bool DWAPlanner::findLookaheadGoal(
   if (lookahead_idx == nearest_idx && lookahead_idx < path.size() - 1)
   {
     // Path quá ngắn: dùng tangent của segment hiện tại
-    double dx = path[lookahead_idx + 1].first - path[lookahead_idx].first;
+    double dx = path[lookahead_idx + 1].first - path[lookahead_idx].first; 
     double dy = path[lookahead_idx + 1].second - path[lookahead_idx].second;
-    double path_tangent = std::atan2(dy, dx);
-    goal_angle = normalizeAngle(path_tangent - robot_theta);
+    double path_tangent = std::atan2(dy, dx); // θ_path ​= arctan(y_(k+1) ​− y_k​, x_(k+1)​ − x_k​)
+    goal_angle = normalizeAngle(path_tangent - robot_theta); 
     return true;
   }
 
@@ -90,7 +92,7 @@ bool DWAPlanner::findLookaheadGoal(
   // 4. Cross-track correction (giữ nguyên):
   //    Nếu robot lệch khỏi path, bù steering để về gần path hơn
   // ================================================================
-  const double CROSS_TRACK_THRESH = 0.20;
+  const double CROSS_TRACK_THRESH = 0.10;   // Nếu lệch > 10cm → bắt đầu bẻ lái
   if (min_dist > CROSS_TRACK_THRESH)
   {
     // Tính path_tangent tại nearest segment để biết chiều cross-track
@@ -110,9 +112,10 @@ bool DWAPlanner::findLookaheadGoal(
 
     double cte_dx = robot_x - path[nearest_idx].first;
     double cte_dy = robot_y - path[nearest_idx].second;
-    double cross_track = -std::sin(path_tangent) * cte_dx + std::cos(path_tangent) * cte_dy;
+    // e_ct​ = −sin(θ_path​)*Δx + cos(θ_path​)*Δy
+    double cross_track = -std::sin(path_tangent) * cte_dx + std::cos(path_tangent) * cte_dy; 
 
-    const double LOOKAHEAD_CORR = 0.6;
+    const double LOOKAHEAD_CORR = 0.7;
     double correction = std::atan2(-cross_track, LOOKAHEAD_CORR);
     correction = std::max(-0.3, std::min(0.3, correction));
 

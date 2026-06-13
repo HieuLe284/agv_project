@@ -13,10 +13,6 @@ void slam::MapBuilder::setPublisher(
     pub_ = pub;
 }
 
-void slam::MapBuilder::clearMap() {
-    std::fill(log_odds_.begin(), log_odds_.end(), 0.0f);
-}
-
 void slam::MapBuilder::updateFromRanges(const std::vector<float>& ranges,
                                   double angle_min, double angle_inc,
                                   double px, double py, double pth)
@@ -61,18 +57,26 @@ void slam::MapBuilder::updateFromRanges(const std::vector<float>& ranges,
     }
 }
 
+// Chuyển dữ liệu bản đồ nội bộ của SLAM thành message ( map -> rviz )
 nav_msgs::msg::OccupancyGrid slam::MapBuilder::buildOccupancyGrid(rclcpp::Time stamp) const {
     nav_msgs::msg::OccupancyGrid msg;
     msg.header.stamp    = stamp;
     msg.header.frame_id = "map";
     msg.info.resolution = static_cast<float>(resolution_);
+
+    // Thông tin kích thước map
     msg.info.width      = width_;
     msg.info.height     = height_;
+
+    // Thông tin gốc tọa độ bản đồ
     msg.info.origin.position.x = origin_x_;
     msg.info.origin.position.y = origin_y_;
-    msg.info.origin.orientation.w = 1.0;
 
-    msg.data.resize(width_ * height_);
+    msg.info.origin.orientation.w = 1.0; // Hướng của map
+
+    msg.data.resize(width_ * height_); // Cấp phát bộ nhớ 
+
+    // Chuyển log-Odds -> Occupancy
     for (int i = 0; i < width_ * height_; ++i) {
         float l = log_odds_[i];
         if (l >  kThreshOcc)  msg.data[i] = 100;
@@ -80,10 +84,6 @@ nav_msgs::msg::OccupancyGrid slam::MapBuilder::buildOccupancyGrid(rclcpp::Time s
         else                  msg.data[i] = -1;
     }
     return msg;
-}
-
-void slam::MapBuilder::publishMap(rclcpp::Time stamp) {
-    if (pub_) pub_->publish(buildOccupancyGrid(stamp));
 }
 
 void slam::MapBuilder::worldToGrid(double wx, double wy, int& gx, int& gy) const {

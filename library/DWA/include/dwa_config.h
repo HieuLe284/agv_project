@@ -70,9 +70,9 @@ struct DWAConfig {
       // Weights cho chế độ BÌNH THƯỜNG (không nguy hiểm).
       // Khi nguy hiểm, cơ chế Preemptive Escape trong dwa_planner.cpp
       // sẽ override và trả về lệnh xoay thoát trực tiếp.
-      alpha(0.15),          // Heading: bám theo A* path
-      beta(0.4),           // Clearance: né tường từ xa (kết hợp D_normalize=3.0m)
-      gamma(0.3),
+      alpha(0.25),          // Heading: bám theo A* path
+      beta(0.3),           // Clearance: né tường từ xa (kết hợp D_normalize=3.0m)
+      gamma(0.25),
       sensor_max_range(8.0) {}
 };
 

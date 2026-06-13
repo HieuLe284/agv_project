@@ -78,8 +78,6 @@ class DWAPlanner {
     double robot_theta,
     const std::vector<std::pair<double, double>>& path);
 
-  const DWAConfig& getConfig() const { return config_; }
-
  private:
   DWAConfig config_;
   DynamicWindow window_;

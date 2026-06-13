@@ -1,0 +1,62 @@
+digraph AStarAlgorithm {
+    // Cài đặt đồ thị chung
+    graph [fontname="Arial, Helvetica, sans-serif", fontsize=12, rankdir=TB, splines=ortho, nodesep=0.8, ranksep=0.8];
+    node [fontname="Arial, Helvetica, sans-serif", fontsize=10, shape=box, style=filled, fillcolor="#f9f9f9", color="#333333", width=2];
+    edge [fontname="Arial, Helvetica, sans-serif", fontsize=9, color="#666666"];
+
+    // Tiêu đề
+    labelloc="t";
+    label="A* Global Navigation Architecture";
+    fontsize=16;
+    fontweight=bold;
+
+    // Các thành phần cấu trúc (Architecture)
+    subgraph cluster_arch {
+        label="Cấu trúc Modules";
+        style=dashed;
+        color="#888888";
+
+        AStarGlobalPlanner [label="AStarGlobalPlanner\n(Coordinator)\n- updateMap(grid)\n- setGoal()\n- compute(x, y, θ) → Path", fillcolor="#e0eaf5", shape=Mrecord];
+        AStarMap [label="AStarMap\n- Tra cứu mảng 1D\n- Bơm phồng vật cản (Inflation)\n- Ép hệ mét (WorldToGrid)", fillcolor="#fff3cd"];
+        AStarPlanner [label="AStarPlanner\n- Lõi A* (Min-heap node)\n- Heuristic: F = G + H\n- Node kề (8-connectivity)", fillcolor="#d4edda"];
+        PathSimplifier [label="PathSimplifier\n- Lọc điểm thừa (Cross-Product)\n- Cắt tỉa góc tù (Douglas-Peucker)", fillcolor="#f8d7da"];
+
+        AStarGlobalPlanner -> AStarMap [label="Quản lý Map"];
+        AStarGlobalPlanner -> AStarPlanner [label="Gọi thuật toán lõi"];
+        AStarGlobalPlanner -> PathSimplifier [label="Làm mượt Path"];
+    }
+
+    // Nguồn dữ liệu
+    SLAM [label="SLAM / OccupancyGrid\n(Bản đồ thế giới)", shape=cylinder, fillcolor="#eeeeee"];
+    GoalSource [label="Frontier / User\n(Tọa độ Goal X, Y)", shape=ellipse, fillcolor="#cce5ff"];
+    DWA [label="DWA Local Planner\n(Nhận Global Path)", shape=box3d, fillcolor="#cce5ff"];
+    
+    // Data flow (Đường đi dữ liệu)
+    SLAM -> AStarMap [label="Occupancy Grid Matrix"];
+    GoalSource -> AStarGlobalPlanner [label="setGoal(x, y)"];
+    
+    // Quá trình Pipeline
+    AStarMap -> AStarPlanner [label="Truy xuất\nCost(x, y)"];
+    AStarPlanner -> PathSimplifier [label="AStarPath (Raw)\nvector<Node>"];
+    PathSimplifier -> AStarGlobalPlanner [label="AStarPath (Smooth)"];
+    
+    AStarGlobalPlanner -> DWA [label="vector<waypoint>\n(Đã hút lookahead)"];
+
+    // Flow Logic
+    subgraph cluster_logic {
+        label="Luồng kiểm tra (compute loop)";
+        color="#888888";
+        
+        CheckReplan [label="Kiểm tra cần Replan?\n- Mới nhận Goal mới\n- Đến hạn Replan Interval\n- Mất Path hiện tại", shape=diamond, fillcolor="#ffeeba"];
+        RunAstar [label="runAstar(start, goal)"];
+        KeepPath [label="Giữ Path cũ"];
+        CheckGoal [label="Kiểm tra đến đích?\n(dist < goal_tolerance)"];
+        
+        CheckReplan -> RunAstar [label="YES"];
+        CheckReplan -> KeepPath [label="NO"];
+        RunAstar -> CheckGoal;
+        KeepPath -> CheckGoal;
+    }
+
+    AStarGlobalPlanner -> CheckReplan [style=dotted];
+}

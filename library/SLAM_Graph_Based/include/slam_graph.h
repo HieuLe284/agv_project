@@ -135,21 +135,6 @@ public:
      */
     bool optimizeIfNeeded();
 
-    // ── Map Builder passthrough ───────────────────────────────────────────
-    void clearMap(); // Xóa toàn bộ Occupancy Grid hiện tại
-
-    void updateMapFromNode(int node_idx); // Cập nhật bản đồ từ dữ liệu của một node
-
-    // ── Tuning proxies ────────────────────────────────────────────────────
-    /**
-     * @brief Trả về đối tượng LoopClosureDetector để điều chỉnh các tham số:
-     *          dist_threshold
-     *          angle_threshold
-     *          correlation_threshold
-     *          ...
-     */
-    LoopClosureDetector& loopDetector();
-
 private:
     LoopClosureDetector  loop_detector_;             // Bộ phát hiện Loop Closure
     MapBuilder*          map_builder_{nullptr};      // Con trỏ tới MapBuilder

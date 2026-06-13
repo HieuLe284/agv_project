@@ -98,11 +98,8 @@ class AStarGlobalPlanner {
   bool hasPath()        const { return current_path_.valid && !current_path_.empty(); }
   // Kiểm tra xem đã đến goal chưa
   bool isGoalReached()  const { return goal_reached_; }
-  // Kiểm tra xem có yêu cầu replan ngay lập tức không
-  bool isReplanPending() const { return has_pending_replan_; }
 
   const AStarPath&    getCurrentPath()   const { return current_path_; }
-  const AStarConfig&  getConfig()        const { return config_; }
 
   // Reset lại toàn bộ trạng thái
   void reset();
@@ -122,8 +119,6 @@ class AStarGlobalPlanner {
    * trong Euclid 2D
    * @return angle_error ∈ [-π, π]
    */
-  // Góc giữa 2 vector
-  static double angleToTarget(double from_x, double from_y, double theta, double to_x, double to_y);
   // Khoảng cách Euclidean 2D
   static double dist(double x1, double y1, double x2, double y2);
   

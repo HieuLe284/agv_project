@@ -51,10 +51,6 @@ public:
 
     void setPublisher(rclcpp::Publisher<nav_msgs::msg::OccupancyGrid>::SharedPtr pub);
 
-    // Xóa toàn bộ bản đồ bằng cách đặt tất cả giá trị log-odds về 0
-    // (trạng thái chưa biết - unknown)
-    void clearMap();
-
     /**
      * @brief Cập nhật bản đồ lưới từ một lần quét LiDAR tại pose đã biết.
      * Với mỗi giá trị khoảng cách hợp lệ r tại góc φ:
@@ -73,8 +69,6 @@ public:
 
     // Tạo thông điệp ROS OccupancyGrid từ lưới log-odds hiện tại
     nav_msgs::msg::OccupancyGrid buildOccupancyGrid(rclcpp::Time stamp) const;
-
-    void publishMap(rclcpp::Time stamp); // Publish bản đồ OccupancyGrid lên ROS topic
 
     int    width_{0}, height_{0}; // Kích thước bản đồ lưới (được sử dụng bên ngoài lớp)
     double resolution_{0.05}; // Độ phân giải bản đồ [m/ô]

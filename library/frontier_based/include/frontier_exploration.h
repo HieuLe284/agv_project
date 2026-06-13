@@ -89,8 +89,6 @@ class FrontierExploration {
    */
   void reset();
 
-  const FrontierConfig& getConfig() const { return config_; }
-
   /**
    * @brief Trả về danh sách frontier regions từ lần detect cuối (debug)
    */

@@ -1,0 +1,53 @@
+digraph FrontierBased {
+    // Cài đặt đồ thị chung
+    graph [fontname="Arial, Helvetica, sans-serif", fontsize=12, rankdir=TB, splines=ortho, nodesep=0.8, ranksep=0.8];
+    node [fontname="Arial, Helvetica, sans-serif", fontsize=10, shape=box, style=filled, fillcolor="#f9f9f9", color="#333333", width=2];
+    edge [fontname="Arial, Helvetica, sans-serif", fontsize=9, color="#666666"];
+
+    // Tiêu đề
+    labelloc="t";
+    label="Frontier-Based Exploration Architecture\n(Yamauchi 1997)";
+    fontsize=16;
+    fontweight=bold;
+
+    // Các thành phần cấu trúc (Architecture)
+    subgraph cluster_arch {
+        label="Cấu trúc Modules";
+        style=dashed;
+        color="#888888";
+
+        FrontierExploration [label="FrontierExploration\n(Coordinator)\n- Quản lý trạng thái\n- Lệnh chu kỳ: update() & compute()", fillcolor="#e0eaf5", shape=Mrecord];
+        FrontierMap [label="FrontierMap\n- Lưu trữ 1D Map\n- Cập nhật từ SLAM", fillcolor="#fff3cd"];
+        FrontierDetector [label="FrontierDetector\n- Quét điểm Frontier\n- Lọc nhiễu (safe_radius)\n- Thuật toán BFS Wave-Front", fillcolor="#d4edda"];
+        FrontierSelector [label="FrontierSelector\n- Chấm điểm Vùng (Region)\n- D = w_dist·Dist + w_size(1-Size)", fillcolor="#f8d7da"];
+
+        FrontierExploration -> FrontierMap [label="update(grid)"];
+        FrontierExploration -> FrontierDetector [label="detect()"];
+        FrontierExploration -> FrontierSelector [label="select(regions)"];
+    }
+
+    // Luồng dữ liệu và điều khiển (Data & Control Flow)
+    SLAM [label="SLAM / OccupancyGrid\n(Value: Free=0, Occ=100, Unk=-1)", shape=cylinder, fillcolor="#eeeeee"];
+    Goal [label="Goal (x, y)\n(Gửi xuống A* Planner)", shape=ellipse, fillcolor="#cce5ff"];
+    
+    SLAM -> FrontierMap [label="Occupancy Grid Matrix"];
+    FrontierMap -> FrontierDetector [label="1D Array / isFree(), isUnknown()"];
+    FrontierDetector -> FrontierSelector [label="vector<FrontierRegion>\n(Quy tụ điểm bằng BFS)"];
+    FrontierSelector -> Goal [label="Best Region Centroid\n(Có Boundary Projection)"];
+
+    // Flow Logic
+    subgraph cluster_logic {
+        label="Luồng xử lý (compute loop)";
+        color="#888888";
+        
+        CheckReplan [label="Kiểm tra cần Replan?\n- Đã đến đích (A* signal)\n- Mất mục tiêu\n- Bị kẹt (Timeout > 30s)", shape=diamond, fillcolor="#ffeeba"];
+        KeepGoal [label="Giữ nguyên Goal cũ"];
+        ExecuteDetect [label="Chạy luồng Detect -> Select"];
+        
+        CheckReplan -> ExecuteDetect [label="YES"];
+        CheckReplan -> KeepGoal [label="NO"];
+    }
+
+    FrontierExploration -> CheckReplan [style=dotted];
+    ExecuteDetect -> FrontierDetector [style=dotted, label="trigger"];
+}

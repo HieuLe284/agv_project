@@ -159,7 +159,7 @@ void SlamRobot::slamTimerCallback()
         auto tf_odom = tf_buffer_->lookupTransform("odom", "base_link", rclcpp::Time());
         ox = tf_odom.transform.translation.x;
         oy = tf_odom.transform.translation.y;
-        // Chuyển quaternion sang góc yaw (θ) dùng helper getYaw()
+        // Chuyển quaternion sang góc yaw (θ) 
         tf2::Quaternion q(tf_odom.transform.rotation.x,
                           tf_odom.transform.rotation.y,
                           tf_odom.transform.rotation.z,
@@ -178,9 +178,9 @@ void SlamRobot::slamTimerCallback()
     double mtheta = normalizeAngle(map_odom_theta + otheta);
 
     // 3. Thực hiện Graph-Based SLAM với pose trong map frame
-    int slam_result = graphSLAMcall(mx, my, mtheta);
     // slam_result: -1 = không có node, 0 = có node mới, 1 = có node mới + optimized
-
+    int slam_result = graphSLAMcall(mx, my, mtheta);
+    
     // 4. Nếu có node mới → cập nhật map→odom TF
     if (slam_result >= 0) {
         int last = slam_graph_.pose_graph.numNodes() - 1;
@@ -350,17 +350,6 @@ int SlamRobot::graphSLAMcall(double x, double y, double theta) {
 }
 
 // ════════════════════════════════════════════════════════════════════════════
-//  refreshCachedGrid — Build a fresh OccupancyGrid snapshot under mutex
-//  Dùng 1 lần duy nhất cho cả frontier + A* + map publish
-// ════════════════════════════════════════════════════════════════════════════
-void SlamRobot::refreshCachedGrid() {
-    auto fresh = map_builder_.buildOccupancyGrid(this->now());
-    std::lock_guard<std::mutex> lock(map_mutex_);
-    cached_occ_grid_ = std::move(fresh);
-    cached_grid_valid_ = true;
-}
-
-// ════════════════════════════════════════════════════════════════════════════
 //  mapBuilderTimerCallback — 2 Hz: publish OccupancyGrid (dùng cached grid)
 // ════════════════════════════════════════════════════════════════════════════
 void SlamRobot::mapBuilderTimerCallback() {
@@ -372,11 +361,22 @@ void SlamRobot::mapBuilderTimerCallback() {
 }
 
 // ════════════════════════════════════════════════════════════════════════════
+//  refreshCachedGrid — Build a fresh OccupancyGrid snapshot under mutex
+//  Dùng 1 lần duy nhất cho cả frontier + A* + map publish
+// ════════════════════════════════════════════════════════════════════════════
+void SlamRobot::refreshCachedGrid() {
+    auto fresh = map_builder_.buildOccupancyGrid(this->now());
+    std::lock_guard<std::mutex> lock(map_mutex_);
+    cached_occ_grid_ = std::move(fresh);
+    cached_grid_valid_ = true;
+}
+
+// ════════════════════════════════════════════════════════════════════════════
 //  graphVizTimerCallback — 0.5 Hz: publish graph visualization only when dirty
 // ════════════════════════════════════════════════════════════════════════════
 void SlamRobot::graphVizTimerCallback()
 {
-    if (!graph_viz_dirty_.load()) return;  // Skip if nothing changed
+    if (!graph_viz_dirty_.load()) return;  // Nếu không thay đổi thì skip
     graph_viz_dirty_.store(false);
 
     const int N = slam_graph_.pose_graph.numNodes();
@@ -457,9 +457,6 @@ void SlamRobot::graphVizTimerCallback()
 // ════════════════════════════════════════════════════════════════════════════
 //  ----------------------------- FRONTIER BASED ------------------------------
 // ════════════════════════════════════════════════════════════════════════════
-//  Reference: Yamauchi — "A Frontier-Based Approach for Autonomous
-//             Exploration" (Proc. IEEE Int. Conf. Robotics & Automation, 1997)
-//
 //  Nguyên lý hoạt động:
 //    1. Robot duy trì occupancy grid M (FREE / OCCUPIED / UNKNOWN)
 //    2. Frontier cell = FREE cell có ít nhất 1 neighbor UNKNOWN
@@ -499,6 +496,8 @@ void SlamRobot::frontierTimerCallback()
         // Nếu chưa có cached grid, bỏ qua frontier lần này
         return;
     }
+
+    // ── Lấy dữ liệu từ SLAM ──────────────────────────────────────────────
     {
         std::lock_guard<std::mutex> lock(map_mutex_);
         frontier_explorer_.update(cached_occ_grid_);
@@ -671,6 +670,8 @@ void SlamRobot::slam_globalPlanner(double rx, double ry, double rth)
 {
     // Dùng cached grid thay vì build 256K cells mới
     if (!cached_grid_valid_) return;
+
+    // Nhận goal từ Frontier
     std::lock_guard<std::mutex> lock(map_mutex_);
     global_planner_.updateMap(cached_occ_grid_);
 
@@ -1036,8 +1037,7 @@ void SlamRobot::slam_localPlanner(double rx, double ry, double rth,
 
     DWAState state(rx, ry, rth, rv, rw);
 
-    std::vector<float> scan_f(cached_scan_ranges_.begin(),
-                              cached_scan_ranges_.end());
+    std::vector<float> scan_f(cached_scan_ranges_.begin(), cached_scan_ranges_.end()); // Lidar Scan
 
     auto [v_star, w_star] = dwa_planner_.computeVelocity(
         state,
@@ -1046,7 +1046,7 @@ void SlamRobot::slam_localPlanner(double rx, double ry, double rth,
         cached_scan_angle_increment_,
         0.0,         // yaw_offset: LiDAR đặt thẳng trục robot
         rx, ry, rth,
-        cached_global_path_
+        cached_global_path_ 
     );
 
     current_v_ = v_star;

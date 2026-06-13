@@ -87,7 +87,6 @@ class FrontierMap {
   int getWidth() const { return width_; }
   int getHeight() const { return height_; }
   
-  double getResolution() const { return resolution_; }
   bool hasMap() const { return has_map_; }
 
   // Mảng không gian 2D được lưu dưới dạng 1D

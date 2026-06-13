@@ -59,8 +59,6 @@ class AStarMap {
   bool isValid(int x, int y) const;
   // Kiểm tra cell có giá trị 0 (đi được)
   bool isFree(int x, int y) const;       // value == 0
-  // Kiểm tra cell có giá trị -1 (chưa biết)
-  bool isUnknown(int x, int y) const;    // value == -1
   // Kiểm tra cell có giá trị > threshold (vật cản)
   bool isOccupied(int x, int y, int threshold = 50) const;  //< value > threshold
 
@@ -94,7 +92,6 @@ class AStarMap {
   // ================================================================
   int    getWidth()      const { return width_; }     // Lấy chiều rộng của map 
   int    getHeight()     const { return height_; }    // Lấy chiều cao của map 
-  double getResolution() const { return resolution_; }// Lấy độ phân giải của map 
   bool   hasMap()        const { return has_map_; }   // Kiểm tra map có tồn tại không
 
  private:

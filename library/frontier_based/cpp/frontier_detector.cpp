@@ -51,7 +51,7 @@ bool FrontierDetector::isFrontierCell(const FrontierMap& map, int x, int y) cons
   // qua đó chỉ tập hợp các frontier cell ở khu vực không gian thực sự mở.
   // Điều kiện bộ lọc:
   // ∀(dx,dy)∈[−2,2]^2: ¬isOccupied(x+dx,y+dy)
-  int safe_radius = 0; // Cắt bỏ biên trong khoảng 1 cell (~5cm) tính từ tường
+  int safe_radius = 3; // Cắt bỏ biên trong khoảng 3 cell (~15cm) tính từ tường
   for (int dy_s = -safe_radius; dy_s <= safe_radius; ++dy_s) { // O(n^2) dùng để quét các vùng lân cận theo trục x và y
     for (int dx_s = -safe_radius; dx_s <= safe_radius; ++dx_s) {
       int nx = x + dx_s;
@@ -78,8 +78,7 @@ FrontierRegion FrontierDetector::buildRegion(
   FrontierRegion region;
   std::queue<std::pair<int, int>> q; // queue BFS
 
-  // frontier_visited[start_y][start_x] = true; // đánh dấu đã đi qua
-  frontier_visited[start_y * W + start_x] = true;
+  frontier_visited[start_y * W + start_x] = true; // đánh dấu đã đi qua
   q.push({start_x, start_y}); // bắt đầu BFS
 
   double sum_wx = 0.0, sum_wy = 0.0; // tích lũy centroid
@@ -106,12 +105,10 @@ FrontierRegion FrontierDetector::buildRegion(
       int ny = cy + dy[d];
 
       if (!map.isValid(nx, ny)) continue;         // Bảo vệ boundary
-      // if (frontier_visited[ny][nx]) continue;     // Tránh duplicate
       if(frontier_visited[ny * W + nx]) continue;
       if (!isFrontierCell(map, nx, ny)) continue; // Chỉ expand sang frontier khác
 
-      // Expand cluster
-      // frontier_visited[ny][nx] = true;            
+      // Expand cluster   
       frontier_visited[ny * W + nx] = true;
       q.push({nx, ny});
     }
@@ -202,7 +199,6 @@ std::vector<FrontierRegion> FrontierDetector::detect(
     bfs_queue.pop();
 
     // Kiểm tra cell hiện tại có phải frontier cell không
-    // if (isFrontierCell(map, cx, cy) && !frontier_visited[cy][cx]) {
     if (isFrontierCell(map, cx, cy) && !frontier_visited[cy * W + cx]) {
       frontier_cells_found.push_back({cx, cy});
     }

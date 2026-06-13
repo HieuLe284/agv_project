@@ -81,33 +81,3 @@ bool slam::SlamGraph::optimizeIfNeeded() {
   new_loop_this_step_ = false;
   return true;
 }
-
-void slam::SlamGraph::clearMap() {
-  if (map_builder_)
-    map_builder_->clearMap();
-}
-
-// Lấy scan LiDAR đã lưu từ 1 node của pose graph rồi vẽ lại lên Occupancy Grid Map
-void slam::SlamGraph::updateMapFromNode(int node_idx) {
-  // Kiểm tra map builder
-  if (!map_builder_)
-    return;
-
-  // Kiểm tra node hợp lệ 
-  if (node_idx < 0 || node_idx >= pose_graph.numNodes())
-    return;
-  const Node2D &n = pose_graph.nodes[node_idx]; // Lấy node trong graph
-  
-  // Kiểm tra xem có scan hay không
-  if (n.scan_ranges.empty())
-    return;
-
-  // Cập nhật map từ scan của node này
-  std::vector<float> rf(n.scan_ranges.begin(), n.scan_ranges.end());
-  map_builder_->updateFromRanges(rf, n.scan_angle_min, n.scan_angle_increment,
-                                 n.x, n.y, n.theta);
-}
-
-slam::LoopClosureDetector &slam::SlamGraph::loopDetector() { 
-    return loop_detector_; 
-}
