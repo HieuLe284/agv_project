@@ -168,7 +168,11 @@ double TrajectoryScorer::computeHeading(
   double diff = normalizeAngle(theta_pred - goal_angle);
 
   // Góc lệch càng nhỏ thì heading score càng gần 1.0
-  double heading = 1.0 - (std::abs(diff) / M_PI) * (std::abs(diff) / M_PI); // Heading Score
+  // H = 1 - |diff| / π  (tuyến tính)
+  // Lưu ý: KHÔNG dùng bình phương — hàm bình phương tạo gradient phẳng quanh diff≈0
+  // khiến trajectory lệch góc bị phạt quá nhẹ → robot tự rẽ khi đi thẳng.
+  double heading = 1.0 - std::abs(diff) / M_PI; // Heading Score (linear)
+  heading = std::max(0.0, heading);              // Clamp về [0, 1]
   
   return heading;
 }

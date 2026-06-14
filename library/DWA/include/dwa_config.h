@@ -81,7 +81,7 @@ struct DWAConfig {
   DWAConfig()
   : v_max(0.30),         // Vmax: vận tốc tịnh tiến tối đa [m/s]
     v_min(-0.10),        // Hạn chế đi lùi (chỉ dùng emergency)
-    w_max(1.95),          // Tăng w_max để xoay linh hoạt hơn
+    w_max(2.1),          // Tăng w_max để xoay linh hoạt hơn
     a_v_max(3.0),        // Tăng gia tốc → Dynamic Window rộng hơn
     a_w_max(7.0),        // Tăng gia tốc góc
     v_dot_b(1.5),
@@ -90,15 +90,15 @@ struct DWAConfig {
     dt(0.10),
     v_samples(30),
     w_samples(50),
-    alpha(0.25),          // Heading: bám theo A* path
-    beta(0.3),           // Clearance: né tường từ xa (kết hợp D_normalize=3.0m)
-    gamma(0.25),
-    sensor_max_range(5.0),
-    CROSS_TRACK_THRESH(0.10),
+    alpha(0.55),          // Heading: tăng để giữ thẳng hướng tốt hơn
+    beta(0.25),            // Clearance: giảm để clearance không kéo robot sang bên
+    gamma(0.20),
+    sensor_max_range(8.0),
+    CROSS_TRACK_THRESH(0.20),  // Tăng từ 0.10→0.20m: chỉ sửa khi lệch rõ rệt (giảm false trigger)
     LOOKAHEAD_DIST(0.4),
-    LOOKAHEAD_CORR(0.55),
+    LOOKAHEAD_CORR(1.0),       // Tăng từ 0.7→1.0: giảm độ gắt của correction khi lệch đường
     ESCAPE_TRIGGER_DIST(0.25),
-    D_normalize(3.0) {}
+    D_normalize(2.5) {}        // Giảm từ 4.0→2.5m: chỉ lo ngại vật cản trong 2.5m
     // : v_max(0.30),         // Vmax: vận tốc tịnh tiến tối đa [m/s]
     //   v_min(-0.10),        // Hạn chế đi lùi (chỉ dùng emergency)
     //   w_max(1.85),          // Tăng w_max để xoay linh hoạt hơn

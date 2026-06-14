@@ -151,6 +151,31 @@ std::pair<double, double> DWAPlanner::computeVelocity(
   auto obstacles = scanToObstacles(scan_ranges, angle_min, angle_increment, yaw_offset);
 
   // ================================================================
+  // 1.5 ROTATE IN PLACE — Nếu goal lệch hướng quá nhiều (> 1.0 rad ≈ 57 độ)
+  // Xoay tại chỗ cho đến khi hướng gần khớp để tránh việc DWA chạy vòng vòng
+  // tạo limit cycle (circling behavior) trong không gian chật hẹp hoặc cửa phòng.
+  // ================================================================
+  if (std::abs(goal_angle) > 1.0) {
+    double w_target = (goal_angle > 0 ? 1.0 : -1.0) * config_.w_max * 0.8;
+    
+    // Giới hạn tốc độ thay đổi w bởi gia tốc góc a_w_max để chạy mượt
+    double max_dw = config_.a_w_max * config_.dt;
+    double w_out = state.w;
+    if (w_target > state.w + max_dw) {
+      w_out = state.w + max_dw;
+    } else if (w_target < state.w - max_dw) {
+      w_out = state.w - max_dw;
+    } else {
+      w_out = w_target;
+    }
+    w_out = std::max(-config_.w_max, std::min(config_.w_max, w_out));
+
+    std::cout << "[DWA] ROTATE IN PLACE to align with path! goal_angle=" << goal_angle 
+              << " w=" << w_out << std::endl;
+    return {0.0, w_out};
+  }
+
+  // ================================================================
   // 2. PREEMPTIVE ESCAPE — Kiểm tra nguy hiểm TRƯỚC scoring
   // Nếu có chướng ngại vật trong vùng nguy hiểm phía trước,
   // robot lập tức xoay thoát mà không chờ qua vòng sampling.
