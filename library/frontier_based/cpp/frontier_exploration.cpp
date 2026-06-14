@@ -90,7 +90,7 @@ void FrontierExploration::compute(
   if (has_goal_) {
     auto now = std::chrono::steady_clock::now();
     double elapsed = std::chrono::duration<double>(now - goal_set_time_).count();
-    if (elapsed > 30.0) {
+    if (elapsed > config_.TIMEOUT) {
       RCLCPP_WARN(rclcpp::get_logger("FrontierExploration"),
         "[Frontier] Stuck at goal (%.2f, %.2f) for %.0fs. Abandoning and finding new frontier.",
         goal_x_, goal_y_, elapsed);

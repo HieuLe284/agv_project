@@ -7,7 +7,7 @@
 DWAPlanner::DWAPlanner(const DWAConfig& config) : config_(config) {}
 
 // ================================================================
-// findLookaheadGoal — Tìm lookahead point phía trước robot trên path ( heading(v,w))
+// findLookaheadGoal — Tìm lookahead point phía trước robot trên path
 // ================================================================
 bool DWAPlanner::findLookaheadGoal(
     double robot_x, double robot_y, double robot_theta,
@@ -39,8 +39,6 @@ bool DWAPlanner::findLookaheadGoal(
   //    Lấy điểm cách robot khoảng LOOKAHEAD_DIST về phía trước
   //    dọc theo path (Pure-Pursuit style)
   // ================================================================
-  const double LOOKAHEAD_DIST = 0.40;  // Nhìn trước 40cm
-
   // Duyệt từ nearest_idx trở đi, cộng dồn khoảng cách dọc path
   double accumulated = 0.0;
   size_t lookahead_idx = nearest_idx;
@@ -56,7 +54,7 @@ bool DWAPlanner::findLookaheadGoal(
     prev_x = path[i].first;
     prev_y = path[i].second;
 
-    if (accumulated >= LOOKAHEAD_DIST) // s_k >= LOOKAHEAD_DIST
+    if (accumulated >= config_.LOOKAHEAD_DIST) // s_k >= LOOKAHEAD_DIST
     {
       lookahead_idx = i;
       break;
@@ -92,8 +90,7 @@ bool DWAPlanner::findLookaheadGoal(
   // 4. Cross-track correction (giữ nguyên):
   //    Nếu robot lệch khỏi path, bù steering để về gần path hơn
   // ================================================================
-  const double CROSS_TRACK_THRESH = 0.10;   // Nếu lệch > 10cm → bắt đầu bẻ lái
-  if (min_dist > CROSS_TRACK_THRESH)
+  if (min_dist > config_.CROSS_TRACK_THRESH)
   {
     // Tính path_tangent tại nearest segment để biết chiều cross-track
     double path_tangent;
@@ -115,8 +112,8 @@ bool DWAPlanner::findLookaheadGoal(
     // e_ct​ = −sin(θ_path​)*Δx + cos(θ_path​)*Δy
     double cross_track = -std::sin(path_tangent) * cte_dx + std::cos(path_tangent) * cte_dy; 
 
-    const double LOOKAHEAD_CORR = 0.7;
-    double correction = std::atan2(-cross_track, LOOKAHEAD_CORR);
+    
+    double correction = std::atan2(-cross_track, config_.LOOKAHEAD_CORR);
     correction = std::max(-0.3, std::min(0.3, correction));
 
     goal_angle = normalizeAngle(goal_angle + correction);
@@ -162,9 +159,6 @@ std::pair<double, double> DWAPlanner::computeVelocity(
   // Khoảng cách kích hoạt escape: chỉ xét vật cản nằm trong
   // VỆT ĐƯỜNG của robot (|y| <= robot_radius).
   // ================================================================
-
-  const double ESCAPE_TRIGGER_DIST = 0.25;
-
   // Quét vệt đường thẳng phía trước để tìm vật cản gần nhất
   double min_forward_dist = config_.sensor_max_range;
 
@@ -190,7 +184,7 @@ std::pair<double, double> DWAPlanner::computeVelocity(
   //
   // Mục tiêu: "Khi cách vật cản X mét → xoay thoát ngay".
   // ================================================================
-  if (min_forward_dist < ESCAPE_TRIGGER_DIST) {
+  if (min_forward_dist < config_.ESCAPE_TRIGGER_DIST) {
     // === ESCAPE MODE ===
     // So sánh clearance của quỹ đạo rẽ trái vs rẽ phải
     double left_dist  = scorer_.computeDistance(0.08, config_.w_max * 0.6, obstacles, config_);

@@ -142,7 +142,7 @@ double TrajectoryScorer::computeHeading(
   const DWAConfig& config) const
 {
   // ================================================================
-  // Heading Score (như Paper):
+  // Heading Score:
   // Dự đoán góc của robot sau khoảng thời gian dt + thời gian phanh.
   // Thời gian phanh: t_break = |w| / w_dot_b
   // Trong đó:
@@ -180,16 +180,13 @@ double TrajectoryScorer::computeClearanceScore(
   // ================================================================
   // Clearance Score:
   // score = dist / D_normalize
-  //
-  // [FIX]: Tăng D_normalize từ 1.0m lên 3.0m.
   // Trước: tường 2m → score = min(1.0, 2.0/1.0) = 1.0 (không phạt gì!)
   //        → robot không "thấy" tường cho đến khi cách 1m → tránh quá muộn.
   // Sau:   tường 2m → score = min(1.0, 2.0/3.0) = 0.67 (có phạt!)
   //        tường 1m → score = 0.33, tường 0.5m → score = 0.17
   //        → Robot bắt đầu né tường từ 3m → tránh mượt mà, không bị kẹt.
   // ================================================================
-  const double D_normalize = 3.0;  // Nhận "thấy" tường từ 3m để né sớm
-  return std::min(1.0, dist / D_normalize);
+  return std::min(1.0, dist / config.D_normalize);
 }
 
 
