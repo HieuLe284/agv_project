@@ -33,7 +33,7 @@ LiDAR → Graph SLAM → Occupancy Grid → Frontier Exploration → A* → DWA 
 - Gazebo (v11)
 - RViz2
 
-## AGV Pipeline
+## AMR Pipeline
 
 ```mermaid
 flowchart TD
@@ -85,7 +85,7 @@ Demo project di chuyển mô phỏng trong rviz2
 
 ## Repository Structure
 ``` bash
-AGV_Robot/
+AMR_Robot/
 ├── action/
 ├── config/
 ├── include/
@@ -93,7 +93,7 @@ AGV_Robot/
 │   └── slam_robot.h
 │
 ├── launch/
-│   ├── agv_robot.launch.py
+│   ├── amr_robot.launch.py
 │   ├── autonomous_slam.launch.py
 │   ├── gazebo.launch.py
 │   ├── navigation.launch.py
@@ -125,8 +125,8 @@ AGV_Robot/
 
 ```bash
 cd ...                 
-mkdir -p ~/agv_robot
-cd agv_robot
+mkdir -p ~/amr_robot
+cd amr_robot
 ```
 ### Build
 ```bash
@@ -141,48 +141,48 @@ colcon build
 
 ```bash
 # Trong terminal 1
-ros2 launch agv_robot gazebo.launch.py
+ros2 launch amr_robot gazebo.launch.py
 
 # Trong terminal 2 (điều khiển robot)
-. install/setup.bash && ros2 run agv_robot robot_controller
+. install/setup.bash && ros2 run amr_robot robot_controller
 
 # Trong terminal 3 (điều khiển action server)
-. install/setup.bash && ros2 run agv_robot action_server
+. install/setup.bash && ros2 run amr_robot action_server
 
 # Trong terminal 4 (điều khiển action client)
-. install/setup.bash && ros2 action send_goal /move_robot agv_robot/action/MoveCmd "{command: 'up', value: 5}"        # Robot sẽ đi lên trên 5m
-. install/setup.bash && ros2 action send_goal /move_robot agv_robot/action/MoveCmd "{command: 'down', value: 12}"     # Robot sẽ đi xuống dưới 12m
-. install/setup.bash && ros2 action send_goal /move_robot agv_robot/action/MoveCmd "{command: 'circle', value: 1.37}" # Robot sẽ đi theo hình tròn với góc 1.37 radian
+. install/setup.bash && ros2 action send_goal /move_robot amr_robot/action/MoveCmd "{command: 'up', value: 5}"        # Robot sẽ đi lên trên 5m
+. install/setup.bash && ros2 action send_goal /move_robot amr_robot/action/MoveCmd "{command: 'down', value: 12}"     # Robot sẽ đi xuống dưới 12m
+. install/setup.bash && ros2 action send_goal /move_robot amr_robot/action/MoveCmd "{command: 'circle', value: 1.37}" # Robot sẽ đi theo hình tròn với góc 1.37 radian
 ```
 
 ### SLAM
 ```bash
 #Terminal
-ros2 launch agv_robot autonomous_slam.launch.py
+ros2 launch amr_robot autonomous_slam.launch.py
 
 # Terminal 2 - Lưu file bản đồ
-. install/setup.bash && ros2 run nav2_map_server map_saver_cli -f /home/hieu/Hieu/Project/AGV_Robot/map/map
+. install/setup.bash && ros2 run nav2_map_server map_saver_cli -f /home/hieu/Hieu/Project/amr_robot/map/map
 ```
 
 ### Navigation
 
 ```bash
-cd ~/share/AGV_Robot
-colcon build --packages-select agv_robot
+cd ~/share/amr_robot
+colcon build --packages-select amr_robot
 source install/setup.bash
 
 # Terminal 1
-ros2 launch agv_robot gazebo.launch.py
+ros2 launch amr_robot gazebo.launch.py
 
 # Terminal 2 (Khởi động Navigation)
-. install/setup.bash && ros2 launch agv_robot navigation.launch.py
+. install/setup.bash && ros2 launch amr_robot navigation.launch.py
 
 # Terminal 3 (Mở RViz Navigation)
-. install/setup.bash && ros2 launch agv_robot rviz2.launch.py
-. install/setup.bash && rviz2 -d /home/hieuubuntu/share/AGV_Robot/rviz/navigation.rviz
+. install/setup.bash && ros2 launch amr_robot rviz2.launch.py
+. install/setup.bash && rviz2 -d /home/hieuubuntu/share/amr_robot/rviz/navigation.rviz
 
 # Terminal 4 (Mở RViz Navigation)
-. install/setup.bash && ros2 run agv_robot navigation_robot
+. install/setup.bash && ros2 run amr_robot navigation_robot
 
 ```
 
@@ -210,7 +210,7 @@ ros2 topic echo /joint_states
 ros2 topic echo /scan                                       
 ros2 topic echo /cmd_vel                                    
 ros2 topic echo /slam_robot/loop_closure_event
-ros2 topic echo /agv_scan --once
+ros2 topic echo /amr_robot --once
 ros2 topic echo /tf --once
 ros2 topic echo /clock --once
 ros2 run tf2_ros tf2_echo map base_link
